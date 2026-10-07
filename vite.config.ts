@@ -4,10 +4,32 @@ import path from 'path';
 import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
+  // Determine base path for GitHub Pages deployment:
+  // 1. Explicit env variable VITE_BASE_PATH if provided (e.g. "/prompt-vault/")
+  // 2. Extracted from GitHub Actions GITHUB_REPOSITORY (e.g. "username/prompt-vault" -> "/prompt-vault/")
+  // 3. Fallback to './' for relative asset resolution (works in any subdirectory or preview environment)
+  let rawBase = process.env.VITE_BASE_PATH;
+
+  if (!rawBase && process.env.GITHUB_REPOSITORY) {
+    const [, repoName] = process.env.GITHUB_REPOSITORY.split('/');
+    if (repoName) {
+      rawBase = repoName.endsWith('.github.io') ? '/' : `/${repoName}/`;
+    }
+  }
+
+  let basePath = './';
+  if (rawBase) {
+    const trimmed = rawBase.trim();
+    if (trimmed === './' || trimmed === '.') {
+      basePath = './';
+    } else {
+      const withLeading = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+      basePath = withLeading.endsWith('/') ? withLeading : `${withLeading}/`;
+    }
+  }
+
   return {
-    // Configured for GitHub Pages subdirectory deployments (e.g. /prompt-vault/)
-    // Using relative base './' ensures assets resolve correctly at any subpath without a blank white screen
-    base: process.env.VITE_BASE_PATH || './',
+    base: basePath,
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
