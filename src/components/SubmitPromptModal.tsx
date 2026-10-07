@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Check, Plus } from 'lucide-react';
+import { X, Check } from 'lucide-react';
 import { PromptItem, Category, Platform } from '../types';
 import { CATEGORIES, PLATFORMS } from '../data/prompts';
 
@@ -50,7 +50,6 @@ export const SubmitPromptModal: React.FC<SubmitPromptModalProps> = ({
     setTimeout(() => {
       setSubmitted(false);
       onClose();
-      // Reset form
       setTitle('');
       setPromptText('');
       setHowToUse('');
@@ -96,7 +95,6 @@ export const SubmitPromptModal: React.FC<SubmitPromptModalProps> = ({
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-            {/* Title */}
             <div>
               <label className="block font-semibold text-black mb-1">
                 Prompt Title *
@@ -111,7 +109,6 @@ export const SubmitPromptModal: React.FC<SubmitPromptModalProps> = ({
               />
             </div>
 
-            {/* Media Type & Category */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block font-semibold text-black mb-1">Media Type</label>
@@ -141,7 +138,6 @@ export const SubmitPromptModal: React.FC<SubmitPromptModalProps> = ({
               </div>
             </div>
 
-            {/* Platform & Model */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block font-semibold text-black mb-1">Platform</label>
@@ -170,7 +166,6 @@ export const SubmitPromptModal: React.FC<SubmitPromptModalProps> = ({
               </div>
             </div>
 
-            {/* Prompt Text */}
             <div>
               <label className="block font-semibold text-black mb-1">
                 Full Prompt Text *
@@ -185,7 +180,6 @@ export const SubmitPromptModal: React.FC<SubmitPromptModalProps> = ({
               />
             </div>
 
-            {/* How to use guide */}
             <div>
               <label className="block font-semibold text-black mb-1">
                 How to use this prompt (One-line guide) *
@@ -200,7 +194,6 @@ export const SubmitPromptModal: React.FC<SubmitPromptModalProps> = ({
               />
             </div>
 
-            {/* Camera settings */}
             <div>
               <label className="block font-semibold text-black mb-1">
                 Camera & Lens Notes (Optional)

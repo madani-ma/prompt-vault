@@ -8,13 +8,12 @@ import { PromptCard } from './components/PromptCard';
 import { PromptDetailModal } from './components/PromptDetailModal';
 import { SubmitPromptModal } from './components/SubmitPromptModal';
 import { Footer } from './components/Footer';
-import { Search, RotateCcw, Copy, Check, Sparkles, Filter } from 'lucide-react';
+import { Search, RotateCcw, Check } from 'lucide-react';
 
 const SAVED_STORAGE_KEY = 'prompt_vault_saved_ids';
 const USER_PROMPTS_STORAGE_KEY = 'prompt_vault_user_prompts';
 
 export default function App() {
-  // Saved / Bookmarked prompt IDs in localStorage
   const [savedIds, setSavedIds] = useState<string[]>(() => {
     try {
       const stored = localStorage.getItem(SAVED_STORAGE_KEY);
@@ -24,7 +23,6 @@ export default function App() {
     }
   });
 
-  // User-submitted prompts
   const [userPrompts, setUserPrompts] = useState<PromptItem[]>(() => {
     try {
       const stored = localStorage.getItem(USER_PROMPTS_STORAGE_KEY);
@@ -34,7 +32,6 @@ export default function App() {
     }
   });
 
-  // Filter & Search states
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<Category>('All');
   const [selectedPlatform, setSelectedPlatform] = useState<Platform>('All');
@@ -42,14 +39,10 @@ export default function App() {
   const [sortOption, setSortOption] = useState<SortOption>('trending');
   const [showSavedOnly, setShowSavedOnly] = useState(false);
 
-  // Modals & Selected Prompt
   const [activeModalPrompt, setActiveModalPrompt] = useState<PromptItem | null>(null);
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
-
-  // Toast feedback
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Sync savedIds to localStorage
   useEffect(() => {
     try {
       localStorage.setItem(SAVED_STORAGE_KEY, JSON.stringify(savedIds));
@@ -58,7 +51,6 @@ export default function App() {
     }
   }, [savedIds]);
 
-  // Sync user prompts to localStorage
   useEffect(() => {
     try {
       localStorage.setItem(USER_PROMPTS_STORAGE_KEY, JSON.stringify(userPrompts));
@@ -67,12 +59,10 @@ export default function App() {
     }
   }, [userPrompts]);
 
-  // Combined prompt list
   const allPrompts = useMemo(() => {
     return [...userPrompts, ...INITIAL_PROMPTS];
   }, [userPrompts]);
 
-  // Handle Toggle Save
   const handleToggleSave = (id: string) => {
     setSavedIds((prev) => {
       const isAlreadySaved = prev.includes(id);
@@ -82,7 +72,6 @@ export default function App() {
     });
   };
 
-  // Toast trigger
   const showToast = (message: string) => {
     setToastMessage(message);
     setTimeout(() => {
@@ -90,18 +79,15 @@ export default function App() {
     }, 2800);
   };
 
-  // Handle Copy Prompt
-  const handleCopyPrompt = (promptText: string, id: string) => {
+  const handleCopyPrompt = (_promptText: string, _id: string) => {
     showToast('Prompt copied to clipboard');
   };
 
-  // Add User-Submitted Prompt
   const handleAddNewPrompt = (newPrompt: PromptItem) => {
     setUserPrompts((prev) => [newPrompt, ...prev]);
     showToast('Prompt successfully added to vault!');
   };
 
-  // Category counts based on active platform & media type filters
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = { All: allPrompts.length };
     allPrompts.forEach((item) => {
@@ -110,31 +96,25 @@ export default function App() {
     return counts;
   }, [allPrompts]);
 
-  // Filtered & Sorted prompts
   const filteredPrompts = useMemo(() => {
     let list = [...allPrompts];
 
-    // Saved only filter
     if (showSavedOnly) {
       list = list.filter((p) => savedIds.includes(p.id));
     }
 
-    // Category filter
     if (selectedCategory !== 'All') {
       list = list.filter((p) => p.category === selectedCategory);
     }
 
-    // Platform filter
     if (selectedPlatform !== 'All') {
       list = list.filter((p) => p.platform === selectedPlatform || p.platform === 'Multi-Platform');
     }
 
-    // Media type filter
     if (selectedMediaType !== 'all') {
       list = list.filter((p) => p.type === selectedMediaType);
     }
 
-    // Search query filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
       list = list.filter((p) => {
@@ -150,7 +130,6 @@ export default function App() {
       });
     }
 
-    // Sorting
     if (sortOption === 'trending') {
       list.sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0) || b.copyCount - a.copyCount);
     } else if (sortOption === 'copies') {
@@ -171,7 +150,6 @@ export default function App() {
     sortOption,
   ]);
 
-  // Count active filters
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (searchQuery.trim()) count++;

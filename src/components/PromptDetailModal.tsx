@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Copy, Check, Bookmark, Video, Image as ImageIcon, Sliders, ExternalLink } from 'lucide-react';
+import { X, Copy, Check, Bookmark } from 'lucide-react';
 import { PromptItem } from '../types';
 
 interface PromptDetailModalProps {

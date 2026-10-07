@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bookmark, Plus, Sparkles, Video } from 'lucide-react';
+import { Bookmark, Plus } from 'lucide-react';
 
 interface HeaderProps {
   savedCount: number;
@@ -14,7 +14,6 @@ export const Header: React.FC<HeaderProps> = ({
   showSavedOnly,
   onToggleSavedOnly,
   onOpenSubmitModal,
-  totalPromptsCount,
 }) => {
   return (
     <header className="sticky top-0 z-30 w-full bg-[#fafafa]/90 backdrop-blur-md border-b border-black/10">

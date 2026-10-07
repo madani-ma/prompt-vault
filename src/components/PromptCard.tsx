@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Copy, Check, Bookmark, ArrowUpRight, Film, Image as ImageIcon, Info, Share2 } from 'lucide-react';
+import { Copy, Check, Bookmark, ArrowUpRight, Info, Share2 } from 'lucide-react';
 import { PromptItem } from '../types';
 
 interface PromptCardProps {
@@ -115,7 +115,7 @@ export const PromptCard: React.FC<PromptCardProps> = ({
           )}
         </div>
 
-        {/* Section 5: Short one-line "How to use this prompt" guide under each prompt card */}
+        {/* Short one-line "How to use this prompt" guide under each prompt card */}
         <div className="pt-3 border-t border-neutral-100 mt-auto">
           <div className="flex items-start gap-2 text-xs text-neutral-600 bg-neutral-50/60 p-2.5 border border-neutral-100">
             <Info className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0 mt-0.5" />
@@ -129,7 +129,6 @@ export const PromptCard: React.FC<PromptCardProps> = ({
 
       {/* Card Footer: Copy Button & Detail Trigger */}
       <div className="px-5 py-3.5 sm:px-6 bg-neutral-50/50 border-t border-neutral-150 flex items-center justify-between gap-3">
-        {/* Copy metric or details link */}
         <button
           onClick={() => onSelectPrompt(item)}
           className="text-xs text-neutral-500 hover:text-black font-medium flex items-center gap-1 transition-colors"
@@ -138,7 +137,6 @@ export const PromptCard: React.FC<PromptCardProps> = ({
           <ArrowUpRight className="w-3 h-3" />
         </button>
 
-        {/* Prominent Copy Button (Black & White minimal styling) */}
         <button
           onClick={handleCopy}
           className={`flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold transition-all ${

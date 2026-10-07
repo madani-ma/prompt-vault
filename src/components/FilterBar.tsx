@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { Search, X, SlidersHorizontal, ArrowUpDown } from 'lucide-react';
+import { Search, X, ArrowUpDown } from 'lucide-react';
 import { Category, Platform, MediaType, SortOption } from '../types';
 import { CATEGORIES, PLATFORMS } from '../data/prompts';
 
@@ -36,7 +36,6 @@ export const FilterBar: React.FC<FilterBarProps> = ({
 }) => {
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Keyboard shortcut '/' to focus search
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === '/' && document.activeElement !== searchInputRef.current) {

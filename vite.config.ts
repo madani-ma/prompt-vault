@@ -5,10 +5,13 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
+    // Configured for GitHub Pages subdirectory deployments (e.g. /prompt-vault/)
+    // Using relative base './' ensures assets resolve correctly at any subpath without a blank white screen
+    base: process.env.VITE_BASE_PATH || './',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
+        '@': path.resolve(import.meta.dirname, '.'),
       },
     },
     server: {
