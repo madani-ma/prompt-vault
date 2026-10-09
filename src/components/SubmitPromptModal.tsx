@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
-import { X, Check } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { X, Check, Lock, Upload, ArrowRight, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { PromptItem, Category, Platform } from '../types';
 import { CATEGORIES, PLATFORMS } from '../data/prompts';
+
+const CORRECT_PASSWORD = 'MBS777ZX';
 
 interface SubmitPromptModalProps {
   isOpen: boolean;
@@ -14,89 +16,192 @@ export const SubmitPromptModal: React.FC<SubmitPromptModalProps> = ({
   onClose,
   onSubmit,
 }) => {
+  // Always starts completely empty by default
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+
   const [title, setTitle] = useState('');
-  const [type, setType] = useState<'video' | 'image'>('video');
   const [category, setCategory] = useState<Exclude<Category, 'All'>>('Cinematic');
   const [platform, setPlatform] = useState<Exclude<Platform, 'All'>>('TikTok');
-  const [model, setModel] = useState('Runway Gen-3 Alpha');
+  const [model, setModel] = useState('Midjourney v6.1 / Flux.1');
+  const [aspectRatio, setAspectRatio] = useState<'9:16' | '16:9' | '1:1' | '4:5'>('9:16');
   const [promptText, setPromptText] = useState('');
   const [howToUse, setHowToUse] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [cameraSettings, setCameraSettings] = useState('');
+  const [authorName, setAuthorName] = useState('');
   const [submitted, setSubmitted] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
 
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert('File size exceeds 5MB limit.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        setImagePreview(result);
+        setImageUrl(result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleModalClose = () => {
+    setPassword('');
+    setPasswordError('');
+    setShowPassword(false);
+    onClose();
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !promptText.trim() || !howToUse.trim()) return;
+    setPasswordError('');
+
+    // Verify Password: MBS777ZX
+    if (password.trim() !== CORRECT_PASSWORD) {
+      setPasswordError('Incorrect password. Access denied.');
+      return;
+    }
+
+    if (!title.trim() || !promptText.trim() || !howToUse.trim()) {
+      return;
+    }
 
     const newPrompt: PromptItem = {
-      id: `user-${Date.now()}`,
+      id: `prompt-${Date.now()}`,
       title: title.trim(),
-      type,
+      type: 'image',
       category,
       platform,
-      model: model.trim() || 'Runway Gen-3 Alpha',
-      aspectRatio: '9:16',
+      model: model.trim() || 'Midjourney v6.1 / Flux.1',
+      aspectRatio,
+      imageUrl: imagePreview || imageUrl.trim() || undefined,
       prompt: promptText.trim(),
       howToUse: howToUse.trim(),
       cameraSettings: cameraSettings.trim() || undefined,
+      submittedBy: authorName.trim() ? `@${authorName.trim().replace(/^@/, '')}` : 'Creator',
       copyCount: 1,
+      featured: true,
       dateAdded: new Date().toISOString().split('T')[0],
     };
 
     onSubmit(newPrompt);
     setSubmitted(true);
+
     setTimeout(() => {
       setSubmitted(false);
-      onClose();
+      handleModalClose();
+      // Reset form fields
       setTitle('');
       setPromptText('');
       setHowToUse('');
+      setImageUrl('');
+      setImagePreview(null);
       setCameraSettings('');
-    }, 1200);
+      setAuthorName('');
+    }, 1500);
   };
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
-      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs"
+      onClick={handleModalClose}
     >
       <div
-        className="relative w-full max-w-lg bg-white border border-black shadow-2xl p-6 sm:p-8 max-h-[92vh] overflow-y-auto"
+        className="relative w-full max-w-xl bg-white rounded-3xl border border-purple-200/80 shadow-2xl p-6 sm:p-8 max-h-[92vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <button
-          onClick={onClose}
-          className="absolute top-5 right-5 p-1 text-neutral-400 hover:text-black transition-colors"
+          onClick={handleModalClose}
+          className="absolute top-5 right-5 p-2 text-slate-400 hover:text-slate-900 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
           aria-label="Close"
         >
           <X className="w-5 h-5" />
         </button>
 
         <div className="mb-6">
-          <h2 className="text-xl font-bold text-black tracking-tight">
-            Submit an AI Prompt
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-50 text-purple-800 text-[11px] font-black uppercase tracking-wider mb-2">
+            <Lock className="w-3 h-3 text-[#65a30d]" />
+            <span>CREATOR VERIFICATION REQUIRED</span>
+          </div>
+          <h2 className="text-2xl font-black text-slate-950 uppercase tracking-tight">
+            SUBMIT A NEW PROMPT
           </h2>
-          <p className="text-xs text-neutral-500 mt-1">
-            Share a tested, high-retention video or image prompt with fellow creators.
+          <p className="text-xs text-slate-500 mt-1 font-normal">
+            Enter the creator access password to verify and publish your prompt live to the repository.
           </p>
         </div>
 
         {submitted ? (
-          <div className="py-12 text-center space-y-3">
-            <div className="w-12 h-12 bg-black text-white mx-auto flex items-center justify-center">
-              <Check className="w-6 h-6" />
+          <div className="py-12 text-center space-y-4">
+            <div className="w-14 h-14 bg-[#84cc16] text-slate-950 rounded-full mx-auto flex items-center justify-center shadow-md">
+              <Check className="w-8 h-8 stroke-[3]" />
             </div>
-            <h3 className="text-base font-bold text-black">Prompt Published</h3>
-            <p className="text-xs text-neutral-500">
-              Added to your active vault and ready for copying.
+            <h3 className="text-xl font-black uppercase tracking-tight text-slate-900">
+              Prompt Published Live!
+            </h3>
+            <p className="text-xs text-slate-500 max-w-xs mx-auto">
+              Your prompt has been authenticated and added to the public directory.
             </p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+            {/* Password Verification Block: Masked with standard dots, never pre-filled */}
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+              <label className="block font-black uppercase text-slate-900 tracking-wider text-[11px]">
+                Submission Password *
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (passwordError) setPasswordError('');
+                  }}
+                  placeholder="Enter password"
+                  className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm font-mono focus:outline-none transition-colors ${
+                    passwordError
+                      ? 'border-red-500 text-red-950 bg-red-50/30'
+                      : 'border-slate-300 text-slate-900 focus:border-purple-600'
+                  }`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-800 p-1"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+
+              {passwordError ? (
+                <div className="flex items-center gap-1.5 text-red-600 font-bold text-[11px] pt-1">
+                  <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span>{passwordError}</span>
+                </div>
+              ) : (
+                <p className="text-[11px] text-slate-500">
+                  Password protected to prevent spam.
+                </p>
+              )}
+            </div>
+
+            {/* Prompt Details */}
             <div>
-              <label className="block font-semibold text-black mb-1">
+              <label className="block font-bold uppercase text-slate-800 mb-1 tracking-wider">
                 Prompt Title *
               </label>
               <input
@@ -105,29 +210,20 @@ export const SubmitPromptModal: React.FC<SubmitPromptModalProps> = ({
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g. Vintage Super 8 Rooftop Golden Hour"
-                className="w-full px-3 py-2 bg-neutral-50 border border-neutral-300 text-sm text-black focus:outline-none focus:border-black"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:border-purple-600"
               />
             </div>
 
+            {/* Category & Platform */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block font-semibold text-black mb-1">Media Type</label>
-                <select
-                  value={type}
-                  onChange={(e) => setType(e.target.value as 'video' | 'image')}
-                  className="w-full px-3 py-2 bg-neutral-50 border border-neutral-300 text-xs text-black focus:outline-none focus:border-black"
-                >
-                  <option value="video">AI Video</option>
-                  <option value="image">AI Image</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-black mb-1">Category</label>
+                <label className="block font-bold uppercase text-slate-800 mb-1 tracking-wider">
+                  Category
+                </label>
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value as any)}
-                  className="w-full px-3 py-2 bg-neutral-50 border border-neutral-300 text-xs text-black focus:outline-none focus:border-black"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-purple-600"
                 >
                   {CATEGORIES.filter((c) => c !== 'All').map((c) => (
                     <option key={c} value={c}>
@@ -136,15 +232,15 @@ export const SubmitPromptModal: React.FC<SubmitPromptModalProps> = ({
                   ))}
                 </select>
               </div>
-            </div>
 
-            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block font-semibold text-black mb-1">Platform</label>
+                <label className="block font-bold uppercase text-slate-800 mb-1 tracking-wider">
+                  Platform Style
+                </label>
                 <select
                   value={platform}
                   onChange={(e) => setPlatform(e.target.value as any)}
-                  className="w-full px-3 py-2 bg-neutral-50 border border-neutral-300 text-xs text-black focus:outline-none focus:border-black"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-purple-600"
                 >
                   {PLATFORMS.filter((p) => p !== 'All').map((p) => (
                     <option key={p} value={p}>
@@ -153,21 +249,43 @@ export const SubmitPromptModal: React.FC<SubmitPromptModalProps> = ({
                   ))}
                 </select>
               </div>
+            </div>
 
+            {/* AI Model & Aspect Ratio */}
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block font-semibold text-black mb-1">Tested AI Model</label>
+                <label className="block font-bold uppercase text-slate-800 mb-1 tracking-wider">
+                  Target AI Model
+                </label>
                 <input
                   type="text"
                   value={model}
                   onChange={(e) => setModel(e.target.value)}
-                  placeholder="e.g. Runway Gen-3, Midjourney v6"
-                  className="w-full px-3 py-2 bg-neutral-50 border border-neutral-300 text-xs text-black focus:outline-none focus:border-black"
+                  placeholder="e.g. Midjourney v6.1, Flux.1"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-purple-600"
                 />
+              </div>
+
+              <div>
+                <label className="block font-bold uppercase text-slate-800 mb-1 tracking-wider">
+                  Aspect Ratio
+                </label>
+                <select
+                  value={aspectRatio}
+                  onChange={(e) => setAspectRatio(e.target.value as any)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-purple-600"
+                >
+                  <option value="9:16">9:16 (Story / Reel / Shorts)</option>
+                  <option value="4:5">4:5 (Instagram Portrait)</option>
+                  <option value="1:1">1:1 (Square Feed)</option>
+                  <option value="16:9">16:9 (Landscape)</option>
+                </select>
               </div>
             </div>
 
+            {/* Prompt Text */}
             <div>
-              <label className="block font-semibold text-black mb-1">
+              <label className="block font-bold uppercase text-slate-800 mb-1 tracking-wider">
                 Full Prompt Text *
               </label>
               <textarea
@@ -175,44 +293,98 @@ export const SubmitPromptModal: React.FC<SubmitPromptModalProps> = ({
                 rows={4}
                 value={promptText}
                 onChange={(e) => setPromptText(e.target.value)}
-                placeholder="Paste the exact prompt text including camera, lighting, motion parameters..."
-                className="w-full px-3 py-2 bg-neutral-50 border border-neutral-300 font-mono text-xs text-black focus:outline-none focus:border-black"
+                placeholder="Paste the exact prompt text including camera, lighting, and style parameters..."
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs text-slate-900 focus:outline-none focus:border-purple-600"
               />
             </div>
 
+            {/* How to use */}
             <div>
-              <label className="block font-semibold text-black mb-1">
-                How to use this prompt (One-line guide) *
+              <label className="block font-bold uppercase text-slate-800 mb-1 tracking-wider">
+                How to Use This Prompt *
               </label>
               <input
                 type="text"
                 required
                 value={howToUse}
                 onChange={(e) => setHowToUse(e.target.value)}
-                placeholder="e.g. Set camera zoom to -1.5, add subtle motion brush on hair."
-                className="w-full px-3 py-2 bg-neutral-50 border border-neutral-300 text-xs text-black focus:outline-none focus:border-black"
+                placeholder="e.g. Set camera zoom to -1.5, export at 60fps"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-purple-600"
               />
             </div>
 
+            {/* Optional Image Upload or URL */}
             <div>
-              <label className="block font-semibold text-black mb-1">
-                Camera & Lens Notes (Optional)
+              <label className="block font-bold uppercase text-slate-800 mb-1 tracking-wider">
+                Output Image Preview (Optional)
+              </label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Upload Image</span>
+                </button>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept="image/*"
+                  onChange={handleImageFileChange}
+                  className="hidden"
+                />
+                <input
+                  type="text"
+                  value={imageUrl}
+                  onChange={(e) => {
+                    setImageUrl(e.target.value);
+                    setImagePreview(e.target.value || null);
+                  }}
+                  placeholder="Or paste image URL"
+                  className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-purple-600"
+                />
+              </div>
+
+              {imagePreview && (
+                <div className="mt-2.5 relative w-24 h-24 rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
+                  <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setImagePreview(null);
+                      setImageUrl('');
+                    }}
+                    className="absolute top-1 right-1 p-0.5 bg-black/70 text-white rounded-full"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Creator Handle */}
+            <div>
+              <label className="block font-bold uppercase text-slate-800 mb-1 tracking-wider">
+                Creator Handle (Optional)
               </label>
               <input
                 type="text"
-                value={cameraSettings}
-                onChange={(e) => setCameraSettings(e.target.value)}
-                placeholder="e.g. 35mm anamorphic, slow pan right"
-                className="w-full px-3 py-2 bg-neutral-50 border border-neutral-300 text-xs text-black focus:outline-none focus:border-black"
+                value={authorName}
+                onChange={(e) => setAuthorName(e.target.value)}
+                placeholder="e.g. @yourhandle"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-purple-600"
               />
             </div>
 
-            <div className="pt-3">
+            {/* Submit Pill Button with Arrow Icon */}
+            <div className="pt-2">
               <button
                 type="submit"
-                className="w-full py-3 bg-black text-white font-bold text-xs hover:bg-neutral-800 transition-colors"
+                className="w-full py-3.5 bg-[#84cc16] hover:bg-[#a3e635] text-slate-950 font-black uppercase tracking-wider text-xs rounded-full shadow-sm hover:shadow transition-all flex items-center justify-center gap-2 cursor-pointer group"
               >
-                Publish to Vault
+                <span>Verify Password & Publish</span>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </button>
             </div>
           </form>

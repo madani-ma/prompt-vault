@@ -1,29 +1,51 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { PromptItem, Category, Platform, MediaType, SortOption } from './types';
-import { INITIAL_PROMPTS } from './data/prompts';
-import { Header } from './components/Header';
+import { PromptItem, Category, Platform, SortOption, ThemeGrading } from './types';
+import { THEMES } from './theme';
 import { Hero } from './components/Hero';
+import { NavyFeatureSection } from './components/NavyFeatureSection';
 import { FilterBar } from './components/FilterBar';
 import { PromptCard } from './components/PromptCard';
+import { Pagination } from './components/Pagination';
 import { PromptDetailModal } from './components/PromptDetailModal';
 import { SubmitPromptModal } from './components/SubmitPromptModal';
+import { SettingsModal } from './components/SettingsModal';
+import { BottomNavBar } from './components/BottomNavBar';
 import { Footer } from './components/Footer';
-import { Search, RotateCcw, Check } from 'lucide-react';
+import { Check, Sparkles, Inbox } from 'lucide-react';
 
-const SAVED_STORAGE_KEY = 'prompt_vault_saved_ids';
-const USER_PROMPTS_STORAGE_KEY = 'prompt_vault_user_prompts';
+const SAVED_STORAGE_KEY = 'prompt_vault_saved_ids_v6';
+const USER_PROMPTS_STORAGE_KEY = 'prompt_vault_user_submissions_v6';
+const THEME_STORAGE_KEY = 'prompt_vault_theme_v6';
+const ITEMS_PER_PAGE = 6;
 
 export default function App() {
-  const [savedIds, setSavedIds] = useState<string[]>(() => {
+  // Theme state: Live color grading
+  const [currentTheme, setCurrentTheme] = useState<ThemeGrading>(() => {
     try {
-      const stored = localStorage.getItem(SAVED_STORAGE_KEY);
-      return stored ? JSON.parse(stored) : ['pv-01', 'pv-02'];
+      const stored = localStorage.getItem(THEME_STORAGE_KEY);
+      return (stored as ThemeGrading) || 'lavender';
     } catch {
-      return ['pv-01', 'pv-02'];
+      return 'lavender';
     }
   });
 
-  const [userPrompts, setUserPrompts] = useState<PromptItem[]>(() => {
+  const activeTheme = useMemo(() => {
+    return THEMES[currentTheme] || THEMES.lavender;
+  }, [currentTheme]);
+
+  // Saved / Bookmarked prompt IDs (starts empty by default)
+  const [savedIds, setSavedIds] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem(SAVED_STORAGE_KEY);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Prompt Repository: Completely empty by default.
+  // ONLY prompts submitted by the user through the "+" button appear.
+  const [prompts, setPrompts] = useState<PromptItem[]>(() => {
     try {
       const stored = localStorage.getItem(USER_PROMPTS_STORAGE_KEY);
       return stored ? JSON.parse(stored) : [];
@@ -32,17 +54,25 @@ export default function App() {
     }
   });
 
+  // Filter & Search states
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<Category>('All');
   const [selectedPlatform, setSelectedPlatform] = useState<Platform>('All');
-  const [selectedMediaType, setSelectedMediaType] = useState<MediaType>('all');
   const [sortOption, setSortOption] = useState<SortOption>('trending');
   const [showSavedOnly, setShowSavedOnly] = useState(false);
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Modals
   const [activeModalPrompt, setActiveModalPrompt] = useState<PromptItem | null>(null);
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+
+  // Toast feedback
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // Sync state to storage
   useEffect(() => {
     try {
       localStorage.setItem(SAVED_STORAGE_KEY, JSON.stringify(savedIds));
@@ -53,16 +83,21 @@ export default function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(USER_PROMPTS_STORAGE_KEY, JSON.stringify(userPrompts));
+      localStorage.setItem(USER_PROMPTS_STORAGE_KEY, JSON.stringify(prompts));
     } catch (e) {
       console.error(e);
     }
-  }, [userPrompts]);
+  }, [prompts]);
 
-  const allPrompts = useMemo(() => {
-    return [...userPrompts, ...INITIAL_PROMPTS];
-  }, [userPrompts]);
+  useEffect(() => {
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, currentTheme);
+    } catch (e) {
+      console.error(e);
+    }
+  }, [currentTheme]);
 
+  // Handle Toggle Save
   const handleToggleSave = (id: string) => {
     setSavedIds((prev) => {
       const isAlreadySaved = prev.includes(id);
@@ -80,24 +115,27 @@ export default function App() {
   };
 
   const handleCopyPrompt = (_promptText: string, _id: string) => {
-    showToast('Prompt copied to clipboard');
+    showToast('Prompt copied to clipboard!');
   };
 
+  // Add Public Verified Submission
   const handleAddNewPrompt = (newPrompt: PromptItem) => {
-    setUserPrompts((prev) => [newPrompt, ...prev]);
-    showToast('Prompt successfully added to vault!');
+    setPrompts((prev) => [newPrompt, ...prev]);
+    showToast('Prompt successfully published to vault!');
   };
 
+  // Category counts
   const categoryCounts = useMemo(() => {
-    const counts: Record<string, number> = { All: allPrompts.length };
-    allPrompts.forEach((item) => {
+    const counts: Record<string, number> = { All: prompts.length };
+    prompts.forEach((item) => {
       counts[item.category] = (counts[item.category] || 0) + 1;
     });
     return counts;
-  }, [allPrompts]);
+  }, [prompts]);
 
+  // Filtered & Sorted prompts
   const filteredPrompts = useMemo(() => {
-    let list = [...allPrompts];
+    let list = [...prompts];
 
     if (showSavedOnly) {
       list = list.filter((p) => savedIds.includes(p.id));
@@ -109,10 +147,6 @@ export default function App() {
 
     if (selectedPlatform !== 'All') {
       list = list.filter((p) => p.platform === selectedPlatform || p.platform === 'Multi-Platform');
-    }
-
-    if (selectedMediaType !== 'all') {
-      list = list.filter((p) => p.type === selectedMediaType);
     }
 
     if (searchQuery.trim()) {
@@ -140,52 +174,64 @@ export default function App() {
 
     return list;
   }, [
-    allPrompts,
+    prompts,
     savedIds,
     showSavedOnly,
     selectedCategory,
     selectedPlatform,
-    selectedMediaType,
     searchQuery,
     sortOption,
   ]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedCategory, selectedPlatform, showSavedOnly, sortOption]);
+
+  // Paginated slice
+  const totalPages = Math.ceil(filteredPrompts.length / ITEMS_PER_PAGE);
+  const paginatedPrompts = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredPrompts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [filteredPrompts, currentPage]);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (searchQuery.trim()) count++;
     if (selectedCategory !== 'All') count++;
     if (selectedPlatform !== 'All') count++;
-    if (selectedMediaType !== 'all') count++;
     if (showSavedOnly) count++;
     return count;
-  }, [searchQuery, selectedCategory, selectedPlatform, selectedMediaType, showSavedOnly]);
+  }, [searchQuery, selectedCategory, selectedPlatform, showSavedOnly]);
 
   const handleResetFilters = () => {
     setSearchQuery('');
     setSelectedCategory('All');
     setSelectedPlatform('All');
-    setSelectedMediaType('all');
     setShowSavedOnly(false);
   };
 
+  const scrollToGrid = () => {
+    const el = document.getElementById('prompt-grid-anchor');
+    if (el) el.scrollIntoView({ behavior: 'smooth' });
+  };
+
   return (
-    <div className="min-h-screen bg-[#fafafa] text-[#111111] flex flex-col selection:bg-black selection:text-white">
-      {/* Top Navigation */}
-      <Header
-        savedCount={savedIds.length}
-        showSavedOnly={showSavedOnly}
-        onToggleSavedOnly={() => setShowSavedOnly((prev) => !prev)}
-        onOpenSubmitModal={() => setIsSubmitModalOpen(true)}
-        totalPromptsCount={allPrompts.length}
+    <div className={`min-h-screen flex flex-col font-sans transition-colors duration-300 ${activeTheme.pageBg} ${activeTheme.textPrimary}`}>
+      {/* NO duplicate top bar: As requested in item 1, the top duplicate bar has been removed entirely */}
+
+      {/* Hero Section: Live theme background and NO extra + button */}
+      <Hero
+        totalCount={prompts.length}
+        theme={activeTheme}
+        onExploreClick={scrollToGrid}
       />
 
-      {/* Hero Section */}
-      <Hero totalCount={allPrompts.length} />
-
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 pt-10 pb-16">
-        {/* Filter & Search Bar */}
+      {/* Main Single-Scroll Content Area */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 pt-10 pb-16">
+        {/* Filter & Search Bar with live theme pill tabs */}
         <FilterBar
+          theme={activeTheme}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           selectedCategory={selectedCategory}
@@ -195,8 +241,6 @@ export default function App() {
           }}
           selectedPlatform={selectedPlatform}
           onSelectPlatform={setSelectedPlatform}
-          selectedMediaType={selectedMediaType}
-          onSelectMediaType={setSelectedMediaType}
           sortOption={sortOption}
           onSortChange={setSortOption}
           activeFilterCount={activeFilterCount}
@@ -205,69 +249,119 @@ export default function App() {
         />
 
         {/* Section Heading & Counter */}
-        <div className="mt-10 mb-6 flex items-center justify-between border-b border-black/10 pb-3">
-          <div className="flex items-center gap-2">
-            <h2 className="text-sm font-bold text-black uppercase tracking-wider">
-              {showSavedOnly ? 'Saved Prompts' : selectedCategory === 'All' ? 'All Prompts' : `${selectedCategory} Prompts`}
+        <div className="mt-10 mb-6 flex items-center justify-between border-b border-slate-200/60 pb-3">
+          <div className="flex items-center gap-2.5">
+            <h2 className="text-sm font-black uppercase tracking-wider">
+              {showSavedOnly ? 'Saved Bookmarks' : selectedCategory === 'All' ? 'Prompt Directory' : `${selectedCategory} Prompts`}
             </h2>
-            <span className="text-xs text-neutral-400 font-mono">
-              ({filteredPrompts.length} results)
+            <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-slate-200/60 text-slate-800">
+              {filteredPrompts.length} Prompts
             </span>
           </div>
 
           {showSavedOnly && (
             <button
               onClick={() => setShowSavedOnly(false)}
-              className="text-xs text-neutral-600 hover:text-black font-medium underline underline-offset-2"
+              className="text-xs font-bold underline underline-offset-2 cursor-pointer text-[#84cc16] hover:opacity-80"
             >
               Show all prompts
             </button>
           )}
         </div>
 
-        {/* Prompt Cards Grid */}
-        {filteredPrompts.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 sm:gap-8">
-            {filteredPrompts.map((item) => (
-              <PromptCard
-                key={item.id}
-                item={item}
-                isSaved={savedIds.includes(item.id)}
-                onToggleSave={handleToggleSave}
-                onCopyPrompt={handleCopyPrompt}
-                onSelectPrompt={(selected) => setActiveModalPrompt(selected)}
-              />
-            ))}
-          </div>
-        ) : (
-          /* Empty Search / Filter State */
-          <div className="py-20 text-center border border-neutral-200 bg-white p-8">
+        {/* Prompt Cards Grid / Empty State */}
+        {prompts.length === 0 ? (
+          /* Empty Vault State: Starts completely empty as requested in item 5 */
+          <div className={`py-24 text-center border rounded-3xl p-8 shadow-xs my-6 ${activeTheme.cardBg} ${activeTheme.cardBorder}`}>
             <div className="max-w-md mx-auto space-y-4">
-              <Search className="w-8 h-8 text-neutral-400 mx-auto" />
-              <h3 className="text-lg font-bold text-black tracking-tight">
-                No matching prompts found
+              <div className="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center bg-[#84cc16]/20 text-[#84cc16]">
+                <Inbox className="w-8 h-8" />
+              </div>
+              <h3 className="text-2xl font-black uppercase tracking-tight">
+                Vault is Ready for Your Prompts
               </h3>
-              <p className="text-xs text-neutral-500 leading-relaxed">
+              <p className={`text-xs leading-relaxed font-normal ${activeTheme.cardSecondaryText}`}>
+                All sample and placeholder prompts have been cleared. Tap the prominent <strong>+</strong> button in the bottom navigation bar to submit your first prompt with the creator password.
+              </p>
+              <div className="pt-2">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-bold bg-slate-100 text-slate-700">
+                  Ready for submissions
+                </span>
+              </div>
+            </div>
+          </div>
+        ) : paginatedPrompts.length > 0 ? (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+              {paginatedPrompts.map((item) => (
+                <PromptCard
+                  key={item.id}
+                  item={item}
+                  theme={activeTheme}
+                  isSaved={savedIds.includes(item.id)}
+                  onToggleSave={handleToggleSave}
+                  onCopyPrompt={handleCopyPrompt}
+                  onSelectPrompt={(selected) => setActiveModalPrompt(selected)}
+                />
+              ))}
+            </div>
+
+            {/* Requirement 4: Numbered Pagination (1, 2, 3...) with green circular highlight and scroll back */}
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              totalItems={filteredPrompts.length}
+              itemsPerPage={ITEMS_PER_PAGE}
+              theme={activeTheme}
+            />
+          </>
+        ) : (
+          /* Filtered empty state (e.g. search didn't match) */
+          <div className={`py-20 text-center border rounded-3xl p-8 shadow-xs ${activeTheme.cardBg} ${activeTheme.cardBorder}`}>
+            <div className="max-w-md mx-auto space-y-4">
+              <h3 className="text-xl font-black uppercase tracking-tight">
+                No matching prompts
+              </h3>
+              <p className={`text-xs leading-relaxed font-normal ${activeTheme.cardSecondaryText}`}>
                 {showSavedOnly
-                  ? "You haven't saved any prompts to your bookmarks yet. Click the bookmark icon on any card to save it."
-                  : `No prompts matched "${searchQuery}". Try searching for keywords like "rain", "coffee", "macro", "drone", or "portrait".`}
+                  ? "You haven't bookmarked any prompts yet. Click the bookmark icon on any card to save it."
+                  : `No prompts matched "${searchQuery}".`}
               </p>
               <div className="pt-2">
                 <button
                   onClick={handleResetFilters}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-black text-white text-xs font-semibold hover:bg-neutral-800 transition-colors"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#84cc16] hover:bg-[#a3e635] text-slate-950 text-xs font-black uppercase tracking-wider rounded-full shadow-xs transition-all cursor-pointer"
                 >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  <span>Reset All Filters</span>
+                  <span>Reset Filters</span>
                 </button>
               </div>
             </div>
           </div>
         )}
+
+        {/* Dark Navy Feature / Info Section */}
+        <NavyFeatureSection
+          theme={activeTheme}
+          onOpenSettingsClick={() => setIsSettingsModalOpen(true)}
+        />
       </main>
 
       {/* Footer */}
       <Footer />
+
+      {/* Requirement 1: ONLY single fixed bottom navigation bar (Settings left, + center, Saved right) */}
+      <BottomNavBar
+        savedCount={savedIds.length}
+        showSavedOnly={showSavedOnly}
+        theme={activeTheme}
+        onOpenSettings={() => setIsSettingsModalOpen(true)}
+        onOpenSubmit={() => setIsSubmitModalOpen(true)}
+        onToggleSaved={() => {
+          setShowSavedOnly((prev) => !prev);
+          scrollToGrid();
+        }}
+      />
 
       {/* Prompt Technical Detail Modal */}
       <PromptDetailModal
@@ -279,17 +373,34 @@ export default function App() {
         onCopyPrompt={handleCopyPrompt}
       />
 
-      {/* Submit Prompt Modal */}
+      {/* Password-Protected Submission Modal (empty password by default, masked dots, no plain text) */}
       <SubmitPromptModal
         isOpen={isSubmitModalOpen}
         onClose={() => setIsSubmitModalOpen(false)}
         onSubmit={handleAddNewPrompt}
       />
 
+      {/* Settings Modal (Instant live color grading switch + AI Natural Language Search) */}
+      <SettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
+        currentTheme={currentTheme}
+        onSelectTheme={(themeKey) => {
+          setCurrentTheme(themeKey);
+          showToast(`Applied ${THEMES[themeKey].name} theme!`);
+        }}
+        allPrompts={prompts}
+        onApplyAISearch={(query) => {
+          setSearchQuery(query);
+          scrollToGrid();
+        }}
+        onSelectPrompt={(selected) => setActiveModalPrompt(selected)}
+      />
+
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-black text-white px-4 py-3 shadow-xl border border-neutral-800 flex items-center gap-2 text-xs font-medium animate-in fade-in slide-in-from-bottom-2 duration-200">
-          <Check className="w-4 h-4 text-white" />
+        <div className="fixed bottom-24 right-6 z-50 bg-slate-950 text-white px-5 py-3.5 shadow-2xl rounded-2xl border border-slate-800 flex items-center gap-2.5 text-xs font-bold animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <Check className="w-4 h-4 text-[#84cc16]" />
           <span>{toastMessage}</span>
         </div>
       )}

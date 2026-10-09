@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { Copy, Check, Bookmark, ArrowUpRight, Info, Share2 } from 'lucide-react';
+import { Copy, Check, Bookmark, ArrowUpRight, Info, Share2, ArrowRight } from 'lucide-react';
 import { PromptItem } from '../types';
+import { ThemeConfig } from '../theme';
 
 interface PromptCardProps {
   item: PromptItem;
+  theme: ThemeConfig;
   isSaved: boolean;
   onToggleSave: (id: string) => void;
   onCopyPrompt: (promptText: string, id: string) => void;
@@ -12,6 +14,7 @@ interface PromptCardProps {
 
 export const PromptCard: React.FC<PromptCardProps> = ({
   item,
+  theme,
   isSaved,
   onToggleSave,
   onCopyPrompt,
@@ -45,28 +48,63 @@ export const PromptCard: React.FC<PromptCardProps> = ({
   return (
     <article
       id={item.id}
-      className="group relative bg-white border border-neutral-200 hover:border-black transition-all duration-200 flex flex-col justify-between"
+      className={`group relative rounded-2xl border ${theme.cardBg} ${theme.cardBorder} ${theme.cardBorderHover} shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between overflow-hidden`}
     >
+      {/* Top Image if present */}
+      {item.imageUrl ? (
+        <div 
+          onClick={() => onSelectPrompt(item)}
+          className="relative w-full aspect-[4/3] sm:aspect-[16/10] overflow-hidden bg-slate-100 border-b border-slate-100 cursor-pointer"
+        >
+          <img
+            src={item.imageUrl}
+            alt={item.title}
+            referrerPolicy="no-referrer"
+            className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-500 ease-out"
+          />
+          <div className="absolute top-3 left-3 bg-slate-950/80 backdrop-blur-xs text-[#84cc16] text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider shadow-xs">
+            Preview
+          </div>
+          {item.submittedBy && (
+            <div className="absolute top-3 right-3 bg-white/90 text-slate-900 text-[10px] font-bold px-2 py-0.5 rounded-full shadow-xs">
+              {item.submittedBy}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div 
+          onClick={() => onSelectPrompt(item)}
+          className="w-full h-12 bg-slate-50 border-b border-slate-100 flex items-center justify-between px-5 cursor-pointer"
+        >
+          <span className={`text-[10px] font-black uppercase tracking-widest ${theme.textSecondary}`}>
+            {item.category} · {item.model}
+          </span>
+          <span className="text-[10px] font-mono opacity-60">
+            {item.aspectRatio}
+          </span>
+        </div>
+      )}
+
       <div className="p-5 sm:p-6 flex-1 flex flex-col">
-        {/* Header: Title and Bookmark Action */}
+        {/* Header: Title and Actions */}
         <div className="flex items-start justify-between gap-4 mb-2">
           <h2
             onClick={() => onSelectPrompt(item)}
-            className="text-lg font-bold text-black tracking-tight group-hover:text-neutral-900 cursor-pointer"
+            className={`text-lg font-black uppercase tracking-tight ${theme.cardText} cursor-pointer transition-colors leading-snug`}
           >
             {item.title}
           </h2>
 
-          <div className="flex items-center gap-1 flex-shrink-0">
+          <div className="flex items-center gap-1.5 flex-shrink-0">
             {/* Share link button */}
             <button
               onClick={handleShare}
-              className="p-1.5 text-neutral-400 hover:text-black transition-colors"
+              className="p-1.5 text-slate-400 hover:text-slate-800 rounded-full transition-colors cursor-pointer"
               title={shareFeedback ? 'Link copied!' : 'Share prompt'}
               aria-label="Share prompt"
             >
               {shareFeedback ? (
-                <Check className="w-4 h-4 text-black" />
+                <Check className="w-4 h-4 text-[#84cc16]" />
               ) : (
                 <Share2 className="w-4 h-4" />
               )}
@@ -75,74 +113,75 @@ export const PromptCard: React.FC<PromptCardProps> = ({
             {/* Bookmark button */}
             <button
               onClick={handleSaveToggle}
-              className="p-1.5 text-neutral-400 hover:text-black transition-colors"
+              className="p-1.5 text-slate-400 hover:text-slate-800 rounded-full transition-colors cursor-pointer"
               title={isSaved ? 'Remove from saved' : 'Save prompt'}
               aria-label={isSaved ? 'Remove from saved' : 'Save prompt'}
             >
               <Bookmark
-                className={`w-4 h-4 ${isSaved ? 'fill-black text-black' : ''}`}
+                className={`w-4 h-4 ${isSaved ? 'fill-[#84cc16] text-[#84cc16]' : ''}`}
               />
             </button>
           </div>
         </div>
 
-        {/* Clean Unboxed Metadata Line (Zero-Pill Discipline) */}
-        <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs text-neutral-500 mb-4 font-medium">
-          <span className="text-black font-semibold">{item.category}</span>
-          <span aria-hidden="true" className="text-neutral-300">·</span>
-          <span>{item.platform}</span>
-          <span aria-hidden="true" className="text-neutral-300">·</span>
-          <span>{item.model}</span>
-          <span aria-hidden="true" className="text-neutral-300">·</span>
-          <span>{item.aspectRatio}</span>
+        {/* Clean Unboxed Metadata Line */}
+        <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs mb-4 font-semibold">
+          <span className={`${theme.textSecondary} uppercase tracking-wide`}>{item.category}</span>
+          <span aria-hidden="true" className="opacity-30">·</span>
+          <span className={theme.cardSecondaryText}>{item.platform}</span>
+          <span aria-hidden="true" className="opacity-30">·</span>
+          <span className={theme.cardSecondaryText}>{item.model}</span>
+          <span aria-hidden="true" className="opacity-30">·</span>
+          <span className="font-mono text-[11px] opacity-70">{item.aspectRatio}</span>
         </div>
 
         {/* Prompt Content Box */}
         <div className="relative mb-4 flex-1">
-          <div className="p-3.5 bg-neutral-50 border border-neutral-150 text-xs font-mono text-neutral-800 leading-relaxed break-words select-all">
-            <p className={!isExpanded && item.prompt.length > 220 ? 'line-clamp-4' : ''}>
+          <div className={`p-3.5 rounded-xl border text-xs font-mono leading-relaxed break-words select-all ${theme.cardPromptBox} ${theme.cardPromptText}`}>
+            <p className={!isExpanded && item.prompt.length > 200 ? 'line-clamp-4' : ''}>
               {item.prompt}
             </p>
           </div>
 
-          {item.prompt.length > 220 && (
+          {item.prompt.length > 200 && (
             <button
               onClick={() => setIsExpanded(!isExpanded)}
-              className="mt-1.5 text-[11px] text-neutral-500 hover:text-black font-medium underline underline-offset-2 transition-colors cursor-pointer"
+              className="mt-1.5 text-[11px] font-bold underline underline-offset-2 transition-colors cursor-pointer"
             >
               {isExpanded ? 'Collapse prompt' : 'Show full prompt'}
             </button>
           )}
         </div>
 
-        {/* Short one-line "How to use this prompt" guide under each prompt card */}
-        <div className="pt-3 border-t border-neutral-100 mt-auto">
-          <div className="flex items-start gap-2 text-xs text-neutral-600 bg-neutral-50/60 p-2.5 border border-neutral-100">
-            <Info className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0 mt-0.5" />
+        {/* Short one-line "How to use this prompt" guide */}
+        <div className="pt-3 border-t border-slate-100 mt-auto">
+          <div className={`flex items-start gap-2 text-xs p-2.5 rounded-xl border ${theme.cardGuideBg} ${theme.cardGuideText}`}>
+            <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-[#84cc16]" />
             <p className="leading-snug">
-              <strong className="font-semibold text-black">How to use:</strong>{' '}
+              <strong className="font-bold uppercase text-[11px]">How to use:</strong>{' '}
               {item.howToUse}
             </p>
           </div>
         </div>
       </div>
 
-      {/* Card Footer: Copy Button & Detail Trigger */}
-      <div className="px-5 py-3.5 sm:px-6 bg-neutral-50/50 border-t border-neutral-150 flex items-center justify-between gap-3">
+      {/* Card Footer: Rounded pill buttons */}
+      <div className="px-5 py-3.5 sm:px-6 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between gap-3">
         <button
           onClick={() => onSelectPrompt(item)}
-          className="text-xs text-neutral-500 hover:text-black font-medium flex items-center gap-1 transition-colors"
+          className="text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer opacity-70 hover:opacity-100"
         >
           <span>Camera specs</span>
-          <ArrowUpRight className="w-3 h-3" />
+          <ArrowUpRight className="w-3.5 h-3.5" />
         </button>
 
+        {/* Rounded pill-shaped Copy button with lime-green accent and small arrow icon */}
         <button
           onClick={handleCopy}
-          className={`flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold transition-all ${
+          className={`flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-black uppercase tracking-wider rounded-full shadow-xs transition-all cursor-pointer group active:scale-95 ${
             copied
-              ? 'bg-neutral-800 text-white'
-              : 'bg-black text-white hover:bg-neutral-800 active:scale-[0.98]'
+              ? 'bg-slate-900 text-white'
+              : 'bg-[#84cc16] hover:bg-[#a3e635] text-slate-950'
           }`}
         >
           {copied ? (
@@ -153,7 +192,8 @@ export const PromptCard: React.FC<PromptCardProps> = ({
           ) : (
             <>
               <Copy className="w-3.5 h-3.5" />
-              <span>Copy Prompt</span>
+              <span>Copy</span>
+              <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
             </>
           )}
         </button>

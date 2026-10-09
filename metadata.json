@@ -1,6 +1,6 @@
 {
   "name": "Prompt Vault",
-  "description": "Trending AI prompts for video and image creators, curated with precision.",
+  "description": "Trending AI image prompts for creators, curated with precision.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

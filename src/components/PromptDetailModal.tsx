@@ -56,11 +56,23 @@ export const PromptDetailModal: React.FC<PromptDetailModalProps> = ({
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 p-1.5 text-neutral-400 hover:text-black transition-colors"
+          className="absolute top-5 right-5 p-1.5 text-neutral-400 hover:text-black transition-colors cursor-pointer z-10"
           aria-label="Close modal"
         >
           <X className="w-5 h-5" />
         </button>
+
+        {/* Optional Image at top */}
+        {item.imageUrl && (
+          <div className="mb-6 -mx-6 sm:-mx-8 -mt-6 sm:-mt-8 border-b border-neutral-200 overflow-hidden bg-neutral-100 max-h-80">
+            <img
+              src={item.imageUrl}
+              alt={item.title}
+              referrerPolicy="no-referrer"
+              className="w-full h-full max-h-80 object-cover"
+            />
+          </div>
+        )}
 
         {/* Modal Header */}
         <div className="pr-10 mb-6">
@@ -69,7 +81,7 @@ export const PromptDetailModal: React.FC<PromptDetailModalProps> = ({
             <span aria-hidden="true">·</span>
             <span>{item.platform}</span>
             <span aria-hidden="true">·</span>
-            <span className="uppercase">{item.type}</span>
+            <span className="uppercase">{item.model}</span>
           </div>
           <h2 className="text-2xl font-extrabold text-black tracking-tight">
             {item.title}
@@ -84,7 +96,7 @@ export const PromptDetailModal: React.FC<PromptDetailModalProps> = ({
             </label>
             <button
               onClick={handleCopy}
-              className="text-xs font-semibold text-black hover:underline flex items-center gap-1"
+              className="text-xs font-semibold text-black hover:underline flex items-center gap-1 cursor-pointer"
             >
               {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
               {copied ? 'Copied to clipboard' : 'Copy'}
@@ -133,7 +145,7 @@ export const PromptDetailModal: React.FC<PromptDetailModalProps> = ({
         <div className="flex items-center justify-between gap-3 pt-4 border-t border-neutral-200">
           <button
             onClick={() => onToggleSave(item.id)}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border transition-colors ${
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border transition-colors cursor-pointer ${
               isSaved
                 ? 'bg-neutral-100 text-black border-black'
                 : 'bg-white text-neutral-700 border-neutral-300 hover:border-black hover:text-black'
@@ -145,7 +157,7 @@ export const PromptDetailModal: React.FC<PromptDetailModalProps> = ({
 
           <button
             onClick={handleCopy}
-            className="flex items-center gap-2 px-6 py-2.5 text-xs font-bold bg-black text-white hover:bg-neutral-800 transition-colors"
+            className="flex items-center gap-2 px-6 py-2.5 text-xs font-bold bg-black text-white hover:bg-neutral-800 transition-colors cursor-pointer"
           >
             {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
             <span>{copied ? 'Prompt Copied!' : 'Copy Full Prompt'}</span>
