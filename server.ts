@@ -57,7 +57,13 @@ async function startServer() {
   app.post('/api/prompts', (req, res) => {
     const { password, prompt } = req.body;
 
-    if (!password || String(password).trim() !== 'MBS777ZX') {
+    const normalizedPassword = String(password || '')
+      .trim()
+      .replace(/[\u200B-\u200D\uFEFF]/g, '')
+      .replace(/\s+/g, '')
+      .toUpperCase();
+
+    if (normalizedPassword !== 'MBS777ZX') {
       return res.status(401).json({ error: 'Incorrect submission password. Access denied.' });
     }
 

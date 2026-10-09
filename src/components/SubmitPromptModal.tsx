@@ -5,6 +5,14 @@ import { CATEGORIES, PLATFORMS } from '../data/prompts';
 
 const CORRECT_PASSWORD = 'MBS777ZX';
 
+const normalizePassword = (input: string) => {
+  return String(input || '')
+    .trim()
+    .replace(/[\u200B-\u200D\uFEFF]/g, '') // remove zero-width/invisible unicode characters
+    .replace(/\s+/g, '') // remove spaces
+    .toUpperCase(); // case-insensitive check
+};
+
 interface SubmitPromptModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -39,6 +47,8 @@ export const SubmitPromptModal: React.FC<SubmitPromptModalProps> = ({
 
   if (!isOpen) return null;
 
+  const isPasswordMatched = normalizePassword(password) === CORRECT_PASSWORD;
+
   const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -68,8 +78,8 @@ export const SubmitPromptModal: React.FC<SubmitPromptModalProps> = ({
     e.preventDefault();
     setPasswordError('');
 
-    // Pre-check Password
-    if (password.trim() !== CORRECT_PASSWORD) {
+    // Pre-check Password with normalization (case-insensitive, trims invisible characters)
+    if (normalizePassword(password) !== CORRECT_PASSWORD) {
       setPasswordError('Incorrect password. Access denied.');
       return;
     }
@@ -106,7 +116,7 @@ export const SubmitPromptModal: React.FC<SubmitPromptModalProps> = ({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          password: password.trim(),
+          password: normalizePassword(password),
           prompt: newPrompt,
         }),
       });
@@ -195,36 +205,57 @@ export const SubmitPromptModal: React.FC<SubmitPromptModalProps> = ({
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-            {/* Password Verification Block: Masked with standard dots, never pre-filled */}
+            {/* Password Verification Block */}
             <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
-              <label className="block font-black uppercase text-slate-900 tracking-wider text-[11px]">
-                Submission Password *
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="block font-black uppercase text-slate-900 tracking-wider text-[11px]">
+                  Submission Password *
+                </label>
+                {isPasswordMatched && (
+                  <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-600 animate-in fade-in">
+                    <Check className="w-3.5 h-3.5 stroke-[3]" />
+                    <span>Password Accepted</span>
+                  </span>
+                )}
+              </div>
+
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
-                  autoComplete="new-password"
+                  autoComplete="off"
                   value={password}
+                  onKeyDown={(e) => {
+                    // Prevent accidental premature submit on mobile enter key
+                    if (e.key === 'Enter') e.preventDefault();
+                  }}
                   onChange={(e) => {
                     setPassword(e.target.value);
                     if (passwordError) setPasswordError('');
                   }}
-                  placeholder="Enter password"
-                  className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm font-mono focus:outline-none transition-colors ${
+                  placeholder="Enter password (e.g. MBS777ZX)"
+                  className={`w-full pl-3.5 pr-20 py-2.5 bg-white border rounded-xl text-sm font-mono focus:outline-none transition-colors ${
                     passwordError
-                      ? 'border-red-500 text-red-950 bg-red-50/30'
+                      ? 'border-red-500 text-red-950 bg-red-50/20'
+                      : isPasswordMatched
+                      ? 'border-emerald-500 text-slate-900 bg-emerald-50/10 ring-1 ring-emerald-500/30'
                       : 'border-slate-300 text-slate-900 focus:border-purple-600'
                   }`}
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-800 p-1"
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+                
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                  {isPasswordMatched && (
+                    <Check className="w-4 h-4 text-emerald-500 mr-1" />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="text-slate-400 hover:text-slate-800 p-1 cursor-pointer"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
 
               {passwordError ? (
@@ -234,7 +265,7 @@ export const SubmitPromptModal: React.FC<SubmitPromptModalProps> = ({
                 </div>
               ) : (
                 <p className="text-[11px] text-slate-500">
-                  Password protected to verify authentic creator submissions.
+                  Password verification occurs upon clicking Submit.
                 </p>
               )}
             </div>
@@ -413,7 +444,7 @@ export const SubmitPromptModal: React.FC<SubmitPromptModalProps> = ({
                 value={authorName}
                 onChange={(e) => setAuthorName(e.target.value)}
                 placeholder="e.g. @yourhandle"
-                className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-purple-600"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-purple-600"
               />
             </div>
 

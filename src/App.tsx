@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { PromptItem, Category, Platform, SortOption, ThemeGrading } from './types';
 import { THEMES } from './theme';
+import { INITIAL_PROMPTS } from './data/prompts';
 import { Hero } from './components/Hero';
 import { NavyFeatureSection } from './components/NavyFeatureSection';
 import { FilterBar } from './components/FilterBar';
@@ -43,7 +44,7 @@ export default function App() {
   });
 
   // Shared Cloud Database: Prompts are fetched from /api/prompts
-  const [prompts, setPrompts] = useState<PromptItem[]>([]);
+  const [prompts, setPrompts] = useState<PromptItem[]>(() => INITIAL_PROMPTS);
   const [isLoadingCloud, setIsLoadingCloud] = useState(true);
 
   // Filter & Search states
@@ -93,7 +94,7 @@ export default function App() {
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) {
-          setPrompts(data);
+          setPrompts(data.length > 0 ? data : INITIAL_PROMPTS);
         }
       }
     } catch (err) {

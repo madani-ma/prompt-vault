@@ -12,6 +12,14 @@ interface PromptCardProps {
   onSelectPrompt: (item: PromptItem) => void;
 }
 
+const resolveImageUrl = (url?: string) => {
+  if (!url) return undefined;
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('/')) {
+    return url;
+  }
+  return `/${url}`;
+};
+
 export const PromptCard: React.FC<PromptCardProps> = ({
   item,
   theme,
@@ -57,7 +65,7 @@ export const PromptCard: React.FC<PromptCardProps> = ({
           className="relative w-full aspect-[4/3] sm:aspect-[16/10] overflow-hidden bg-slate-100 border-b border-slate-100 cursor-pointer"
         >
           <img
-            src={item.imageUrl}
+            src={resolveImageUrl(item.imageUrl)}
             alt={item.title}
             referrerPolicy="no-referrer"
             className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-500 ease-out"

@@ -11,6 +11,14 @@ interface PromptDetailModalProps {
   onCopyPrompt: (promptText: string, id: string) => void;
 }
 
+const resolveImageUrl = (url?: string) => {
+  if (!url) return undefined;
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('/')) {
+    return url;
+  }
+  return `/${url}`;
+};
+
 export const PromptDetailModal: React.FC<PromptDetailModalProps> = ({
   item,
   isOpen,
@@ -66,7 +74,7 @@ export const PromptDetailModal: React.FC<PromptDetailModalProps> = ({
         {item.imageUrl && (
           <div className="mb-6 -mx-6 sm:-mx-8 -mt-6 sm:-mt-8 border-b border-neutral-200 overflow-hidden bg-neutral-100 max-h-80">
             <img
-              src={item.imageUrl}
+              src={resolveImageUrl(item.imageUrl)}
               alt={item.title}
               referrerPolicy="no-referrer"
               className="w-full h-full max-h-80 object-cover"
