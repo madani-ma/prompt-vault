@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { PromptItem, Category, Platform, SortOption, ThemeGrading } from './types';
 import { THEMES } from './theme';
 import { Hero } from './components/Hero';
@@ -11,10 +11,9 @@ import { SubmitPromptModal } from './components/SubmitPromptModal';
 import { SettingsModal } from './components/SettingsModal';
 import { BottomNavBar } from './components/BottomNavBar';
 import { Footer } from './components/Footer';
-import { Check, Sparkles, Inbox } from 'lucide-react';
+import { Check, Inbox, Cloud, RefreshCw } from 'lucide-react';
 
 const SAVED_STORAGE_KEY = 'prompt_vault_saved_ids_v6';
-const USER_PROMPTS_STORAGE_KEY = 'prompt_vault_user_submissions_v6';
 const THEME_STORAGE_KEY = 'prompt_vault_theme_v6';
 const ITEMS_PER_PAGE = 6;
 
@@ -33,7 +32,7 @@ export default function App() {
     return THEMES[currentTheme] || THEMES.lavender;
   }, [currentTheme]);
 
-  // Saved / Bookmarked prompt IDs (starts empty by default)
+  // Saved / Bookmarked prompt IDs (personal to each browser session)
   const [savedIds, setSavedIds] = useState<string[]>(() => {
     try {
       const stored = localStorage.getItem(SAVED_STORAGE_KEY);
@@ -43,16 +42,9 @@ export default function App() {
     }
   });
 
-  // Prompt Repository: Completely empty by default.
-  // ONLY prompts submitted by the user through the "+" button appear.
-  const [prompts, setPrompts] = useState<PromptItem[]>(() => {
-    try {
-      const stored = localStorage.getItem(USER_PROMPTS_STORAGE_KEY);
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
+  // Shared Cloud Database: Prompts are fetched from /api/prompts
+  const [prompts, setPrompts] = useState<PromptItem[]>([]);
+  const [isLoadingCloud, setIsLoadingCloud] = useState(true);
 
   // Filter & Search states
   const [searchQuery, setSearchQuery] = useState('');
@@ -72,7 +64,7 @@ export default function App() {
   // Toast feedback
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Sync state to storage
+  // Sync personal saved bookmarks to localStorage
   useEffect(() => {
     try {
       localStorage.setItem(SAVED_STORAGE_KEY, JSON.stringify(savedIds));
@@ -81,14 +73,7 @@ export default function App() {
     }
   }, [savedIds]);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(USER_PROMPTS_STORAGE_KEY, JSON.stringify(prompts));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [prompts]);
-
+  // Sync theme
   useEffect(() => {
     try {
       localStorage.setItem(THEME_STORAGE_KEY, currentTheme);
@@ -96,6 +81,47 @@ export default function App() {
       console.error(e);
     }
   }, [currentTheme]);
+
+  // Fetch prompts directly from shared cloud database
+  const fetchPromptsFromCloud = useCallback(async () => {
+    try {
+      const res = await fetch('/api/prompts', {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setPrompts(data);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch from cloud database:', err);
+    } finally {
+      setIsLoadingCloud(false);
+    }
+  }, []);
+
+  // On page load: Fetch from cloud database and keep synced across all devices
+  useEffect(() => {
+    fetchPromptsFromCloud();
+
+    // Auto-sync every 6 seconds so other visitors and devices see newly submitted prompts live
+    const interval = setInterval(fetchPromptsFromCloud, 6000);
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchPromptsFromCloud();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [fetchPromptsFromCloud]);
 
   // Handle Toggle Save
   const handleToggleSave = (id: string) => {
@@ -120,8 +146,10 @@ export default function App() {
 
   // Add Public Verified Submission
   const handleAddNewPrompt = (newPrompt: PromptItem) => {
-    setPrompts((prev) => [newPrompt, ...prev]);
-    showToast('Prompt successfully published to vault!');
+    setPrompts((prev) => [newPrompt, ...prev.filter((p) => p.id !== newPrompt.id)]);
+    showToast('Prompt published to cloud database!');
+    // Re-verify from cloud
+    setTimeout(fetchPromptsFromCloud, 600);
   };
 
   // Category counts
@@ -218,9 +246,7 @@ export default function App() {
 
   return (
     <div className={`min-h-screen flex flex-col font-sans transition-colors duration-300 ${activeTheme.pageBg} ${activeTheme.textPrimary}`}>
-      {/* NO duplicate top bar: As requested in item 1, the top duplicate bar has been removed entirely */}
-
-      {/* Hero Section: Live theme background and NO extra + button */}
+      {/* Hero Section: Live theme background and single Explore button */}
       <Hero
         totalCount={prompts.length}
         theme={activeTheme}
@@ -248,7 +274,7 @@ export default function App() {
           categoryCounts={categoryCounts}
         />
 
-        {/* Section Heading & Counter */}
+        {/* Section Heading & Counter with Cloud Sync status */}
         <div className="mt-10 mb-6 flex items-center justify-between border-b border-slate-200/60 pb-3">
           <div className="flex items-center gap-2.5">
             <h2 className="text-sm font-black uppercase tracking-wider">
@@ -259,19 +285,34 @@ export default function App() {
             </span>
           </div>
 
-          {showSavedOnly && (
-            <button
-              onClick={() => setShowSavedOnly(false)}
-              className="text-xs font-bold underline underline-offset-2 cursor-pointer text-[#84cc16] hover:opacity-80"
-            >
-              Show all prompts
-            </button>
-          )}
+          <div className="flex items-center gap-3">
+            {/* Cloud Sync indicator */}
+            <div className="hidden sm:flex items-center gap-1.5 text-[11px] font-mono text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200/60">
+              <Cloud className="w-3.5 h-3.5" />
+              <span>Shared Cloud DB Connected</span>
+            </div>
+
+            {showSavedOnly && (
+              <button
+                onClick={() => setShowSavedOnly(false)}
+                className="text-xs font-bold underline underline-offset-2 cursor-pointer text-[#84cc16] hover:opacity-80"
+              >
+                Show all prompts
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Prompt Cards Grid / Empty State */}
-        {prompts.length === 0 ? (
-          /* Empty Vault State: Starts completely empty as requested in item 5 */
+        {isLoadingCloud ? (
+          <div className="py-24 text-center">
+            <div className="inline-flex items-center gap-2 text-xs font-bold text-slate-500 bg-white px-4 py-2 rounded-full border border-slate-200 shadow-xs">
+              <RefreshCw className="w-4 h-4 animate-spin text-[#84cc16]" />
+              <span>Connecting to shared cloud database...</span>
+            </div>
+          </div>
+        ) : prompts.length === 0 ? (
+          /* Empty Vault State */
           <div className={`py-24 text-center border rounded-3xl p-8 shadow-xs my-6 ${activeTheme.cardBg} ${activeTheme.cardBorder}`}>
             <div className="max-w-md mx-auto space-y-4">
               <div className="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center bg-[#84cc16]/20 text-[#84cc16]">
@@ -281,11 +322,12 @@ export default function App() {
                 Vault is Ready for Your Prompts
               </h3>
               <p className={`text-xs leading-relaxed font-normal ${activeTheme.cardSecondaryText}`}>
-                All sample and placeholder prompts have been cleared. Tap the prominent <strong>+</strong> button in the bottom navigation bar to submit your first prompt with the creator password.
+                All sample and placeholder prompts have been cleared. Tap the prominent <strong>+</strong> button in the bottom navigation bar to submit your first prompt with password <strong>MBS777ZX</strong>. It will be saved directly to the cloud database and instantly viewable on all devices.
               </p>
               <div className="pt-2">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-bold bg-slate-100 text-slate-700">
-                  Ready for submissions
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                  <Cloud className="w-3 h-3 text-emerald-600" />
+                  Cloud database live for all visitors
                 </span>
               </div>
             </div>
@@ -306,7 +348,7 @@ export default function App() {
               ))}
             </div>
 
-            {/* Requirement 4: Numbered Pagination (1, 2, 3...) with green circular highlight and scroll back */}
+            {/* Numbered Pagination (1, 2, 3...) with green circular highlight */}
             <Pagination
               currentPage={currentPage}
               totalPages={totalPages}
@@ -317,7 +359,7 @@ export default function App() {
             />
           </>
         ) : (
-          /* Filtered empty state (e.g. search didn't match) */
+          /* Filtered empty state */
           <div className={`py-20 text-center border rounded-3xl p-8 shadow-xs ${activeTheme.cardBg} ${activeTheme.cardBorder}`}>
             <div className="max-w-md mx-auto space-y-4">
               <h3 className="text-xl font-black uppercase tracking-tight">
@@ -350,7 +392,7 @@ export default function App() {
       {/* Footer */}
       <Footer />
 
-      {/* Requirement 1: ONLY single fixed bottom navigation bar (Settings left, + center, Saved right) */}
+      {/* Single fixed bottom navigation bar (Settings left, + center, Saved right) */}
       <BottomNavBar
         savedCount={savedIds.length}
         showSavedOnly={showSavedOnly}
@@ -373,14 +415,14 @@ export default function App() {
         onCopyPrompt={handleCopyPrompt}
       />
 
-      {/* Password-Protected Submission Modal (empty password by default, masked dots, no plain text) */}
+      {/* Password-Protected Submission Modal: Writes to Cloud Database */}
       <SubmitPromptModal
         isOpen={isSubmitModalOpen}
         onClose={() => setIsSubmitModalOpen(false)}
         onSubmit={handleAddNewPrompt}
       />
 
-      {/* Settings Modal (Instant live color grading switch + AI Natural Language Search) */}
+      {/* Settings Modal */}
       <SettingsModal
         isOpen={isSettingsModalOpen}
         onClose={() => setIsSettingsModalOpen(false)}

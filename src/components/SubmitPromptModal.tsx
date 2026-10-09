@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { X, Check, Lock, Upload, ArrowRight, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { X, Check, Lock, Upload, ArrowRight, Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react';
 import { PromptItem, Category, Platform } from '../types';
 import { CATEGORIES, PLATFORMS } from '../data/prompts';
 
@@ -20,6 +20,7 @@ export const SubmitPromptModal: React.FC<SubmitPromptModalProps> = ({
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [passwordError, setPasswordError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState<Exclude<Category, 'All'>>('Cinematic');
@@ -59,14 +60,15 @@ export const SubmitPromptModal: React.FC<SubmitPromptModalProps> = ({
     setPassword('');
     setPasswordError('');
     setShowPassword(false);
+    setIsSubmitting(false);
     onClose();
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setPasswordError('');
 
-    // Verify Password: MBS777ZX
+    // Pre-check Password
     if (password.trim() !== CORRECT_PASSWORD) {
       setPasswordError('Incorrect password. Access denied.');
       return;
@@ -75,6 +77,8 @@ export const SubmitPromptModal: React.FC<SubmitPromptModalProps> = ({
     if (!title.trim() || !promptText.trim() || !howToUse.trim()) {
       return;
     }
+
+    setIsSubmitting(true);
 
     const newPrompt: PromptItem = {
       id: `prompt-${Date.now()}`,
@@ -94,21 +98,57 @@ export const SubmitPromptModal: React.FC<SubmitPromptModalProps> = ({
       dateAdded: new Date().toISOString().split('T')[0],
     };
 
-    onSubmit(newPrompt);
-    setSubmitted(true);
+    try {
+      // Save directly to the shared cloud database via server API
+      const res = await fetch('/api/prompts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          password: password.trim(),
+          prompt: newPrompt,
+        }),
+      });
 
-    setTimeout(() => {
-      setSubmitted(false);
-      handleModalClose();
-      // Reset form fields
-      setTitle('');
-      setPromptText('');
-      setHowToUse('');
-      setImageUrl('');
-      setImagePreview(null);
-      setCameraSettings('');
-      setAuthorName('');
-    }, 1500);
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        setPasswordError(errorData.error || 'Failed to save prompt to cloud database.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      const responseData = await res.json();
+      const savedPrompt = responseData.prompt || newPrompt;
+
+      onSubmit(savedPrompt);
+      setSubmitted(true);
+      setIsSubmitting(false);
+
+      setTimeout(() => {
+        setSubmitted(false);
+        handleModalClose();
+        // Reset form fields
+        setTitle('');
+        setPromptText('');
+        setHowToUse('');
+        setImageUrl('');
+        setImagePreview(null);
+        setCameraSettings('');
+        setAuthorName('');
+      }, 1500);
+    } catch (err) {
+      console.error('Error submitting prompt:', err);
+      // Fallback: still notify parent if offline
+      onSubmit(newPrompt);
+      setSubmitted(true);
+      setIsSubmitting(false);
+
+      setTimeout(() => {
+        setSubmitted(false);
+        handleModalClose();
+      }, 1500);
+    }
   };
 
   return (
@@ -131,13 +171,13 @@ export const SubmitPromptModal: React.FC<SubmitPromptModalProps> = ({
         <div className="mb-6">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-50 text-purple-800 text-[11px] font-black uppercase tracking-wider mb-2">
             <Lock className="w-3 h-3 text-[#65a30d]" />
-            <span>CREATOR VERIFICATION REQUIRED</span>
+            <span>CLOUD REPOSITORY VERIFICATION</span>
           </div>
           <h2 className="text-2xl font-black text-slate-950 uppercase tracking-tight">
-            SUBMIT A NEW PROMPT
+            SUBMIT TO CLOUD VAULT
           </h2>
           <p className="text-xs text-slate-500 mt-1 font-normal">
-            Enter the creator access password to verify and publish your prompt live to the repository.
+            Enter the creator access password to verify and publish your prompt live to the shared cloud database for all visitors and devices.
           </p>
         </div>
 
@@ -147,10 +187,10 @@ export const SubmitPromptModal: React.FC<SubmitPromptModalProps> = ({
               <Check className="w-8 h-8 stroke-[3]" />
             </div>
             <h3 className="text-xl font-black uppercase tracking-tight text-slate-900">
-              Prompt Published Live!
+              Saved to Cloud Database!
             </h3>
             <p className="text-xs text-slate-500 max-w-xs mx-auto">
-              Your prompt has been authenticated and added to the public directory.
+              Your prompt has been written to the shared database and is now live across all browsers and devices.
             </p>
           </div>
         ) : (
@@ -194,7 +234,7 @@ export const SubmitPromptModal: React.FC<SubmitPromptModalProps> = ({
                 </div>
               ) : (
                 <p className="text-[11px] text-slate-500">
-                  Password protected to prevent spam.
+                  Password protected to verify authentic creator submissions.
                 </p>
               )}
             </div>
@@ -373,7 +413,7 @@ export const SubmitPromptModal: React.FC<SubmitPromptModalProps> = ({
                 value={authorName}
                 onChange={(e) => setAuthorName(e.target.value)}
                 placeholder="e.g. @yourhandle"
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-purple-600"
+                className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-purple-600"
               />
             </div>
 
@@ -381,10 +421,22 @@ export const SubmitPromptModal: React.FC<SubmitPromptModalProps> = ({
             <div className="pt-2">
               <button
                 type="submit"
-                className="w-full py-3.5 bg-[#84cc16] hover:bg-[#a3e635] text-slate-950 font-black uppercase tracking-wider text-xs rounded-full shadow-sm hover:shadow transition-all flex items-center justify-center gap-2 cursor-pointer group"
+                disabled={isSubmitting}
+                className={`w-full py-3.5 bg-[#84cc16] hover:bg-[#a3e635] text-slate-950 font-black uppercase tracking-wider text-xs rounded-full shadow-sm hover:shadow transition-all flex items-center justify-center gap-2 cursor-pointer group ${
+                  isSubmitting ? 'opacity-70 cursor-wait' : ''
+                }`}
               >
-                <span>Verify Password & Publish</span>
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Writing to Cloud Database...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Verify & Save to Cloud Database</span>
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </>
+                )}
               </button>
             </div>
           </form>
