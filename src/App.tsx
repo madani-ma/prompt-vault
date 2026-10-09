@@ -8,7 +8,6 @@ import { FilterBar } from './components/FilterBar';
 import { PromptCard } from './components/PromptCard';
 import { Pagination } from './components/Pagination';
 import { PromptDetailModal } from './components/PromptDetailModal';
-import { SubmitPromptModal } from './components/SubmitPromptModal';
 import { SettingsModal } from './components/SettingsModal';
 import { BottomNavBar } from './components/BottomNavBar';
 import { Footer } from './components/Footer';
@@ -59,7 +58,6 @@ export default function App() {
 
   // Modals
   const [activeModalPrompt, setActiveModalPrompt] = useState<PromptItem | null>(null);
-  const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
   // Toast feedback
@@ -143,14 +141,6 @@ export default function App() {
 
   const handleCopyPrompt = (_promptText: string, _id: string) => {
     showToast('Prompt copied to clipboard!');
-  };
-
-  // Add Public Verified Submission
-  const handleAddNewPrompt = (newPrompt: PromptItem) => {
-    setPrompts((prev) => [newPrompt, ...prev.filter((p) => p.id !== newPrompt.id)]);
-    showToast('Prompt published to cloud database!');
-    // Re-verify from cloud
-    setTimeout(fetchPromptsFromCloud, 600);
   };
 
   // Category counts
@@ -323,7 +313,7 @@ export default function App() {
                 Vault is Ready for Your Prompts
               </h3>
               <p className={`text-xs leading-relaxed font-normal ${activeTheme.cardSecondaryText}`}>
-                All sample and placeholder prompts have been cleared. Tap the prominent <strong>+</strong> button in the bottom navigation bar to submit your first prompt with password <strong>MBS777ZX</strong>. It will be saved directly to the cloud database and instantly viewable on all devices.
+                Your curated prompt repository is connected to the cloud database and synced across all devices.
               </p>
               <div className="pt-2">
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
@@ -393,13 +383,12 @@ export default function App() {
       {/* Footer */}
       <Footer />
 
-      {/* Single fixed bottom navigation bar (Settings left, + center, Saved right) */}
+      {/* Fixed bottom navigation bar (Settings left, Saved right) */}
       <BottomNavBar
         savedCount={savedIds.length}
         showSavedOnly={showSavedOnly}
         theme={activeTheme}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
-        onOpenSubmit={() => setIsSubmitModalOpen(true)}
         onToggleSaved={() => {
           setShowSavedOnly((prev) => !prev);
           scrollToGrid();
@@ -414,13 +403,6 @@ export default function App() {
         isSaved={activeModalPrompt ? savedIds.includes(activeModalPrompt.id) : false}
         onToggleSave={handleToggleSave}
         onCopyPrompt={handleCopyPrompt}
-      />
-
-      {/* Password-Protected Submission Modal: Writes to Cloud Database */}
-      <SubmitPromptModal
-        isOpen={isSubmitModalOpen}
-        onClose={() => setIsSubmitModalOpen(false)}
-        onSubmit={handleAddNewPrompt}
       />
 
       {/* Settings Modal */}

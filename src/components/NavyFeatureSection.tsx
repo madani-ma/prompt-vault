@@ -59,15 +59,15 @@ export const NavyFeatureSection: React.FC<NavyFeatureSectionProps> = ({
                 02
               </div>
               <h3 className="text-base font-extrabold uppercase text-white tracking-wide mb-2">
-                PASSWORD-PROTECTED REPO
+                VERIFIED CREATOR REPO
               </h3>
               <p className="text-xs text-slate-300 leading-relaxed">
-                Submit community prompts with creator verification to prevent spam and maintain high quality.
+                Production-tested visual prompts optimized for viral short-form retention across TikTok, Reels, and Shorts.
               </p>
             </div>
             <div className="mt-6 pt-4 border-t border-slate-800 flex items-center gap-2 text-xs text-[#84cc16] font-semibold">
               <Shield className="w-4 h-4" />
-              <span>Instant public live publishing</span>
+              <span>Tested & verified specs</span>
             </div>
           </div>
 

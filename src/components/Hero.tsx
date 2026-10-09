@@ -42,7 +42,7 @@ export const Hero: React.FC<HeroProps> = ({ totalCount, theme, onExploreClick })
 
         {/* Supporting description */}
         <p className={`max-w-2xl mx-auto text-base sm:text-lg leading-relaxed font-normal mb-8 ${theme.cardSecondaryText}`}>
-          High-retention visual prompts engineered for TikTok, Instagram Reels, and YouTube Shorts. Clean, fast, and password-protected.
+          High-retention visual prompts engineered for TikTok, Instagram Reels, and YouTube Shorts. Clean, fast, and production-tested.
         </p>
 
         {/* Action Button: ONLY Explore Prompts (NO extra + button here) */}
