@@ -2,6 +2,42 @@ import { PromptItem } from '../types';
 
 export const INITIAL_PROMPTS: PromptItem[] = [
   {
+    id: 'prompt-lotus-lake-boat-romance',
+    title: 'Lotus Lake Boat Romance',
+    type: 'image',
+    category: 'Reel',
+    platform: 'Instagram Reel',
+    model: 'Midjourney v6.1 / Flux.1',
+    aspectRatio: '4:6',
+    imageUrl: 'lotus_boat_couple.jpg',
+    prompt: "Cinematic vertical portrait, 4:6, couple sitting in a boat on a lake full of pink lotus flowers, shot in a sideways-rotated frame. A young Indian woman in a hot pink sleeveless dress with a ruffled skirt sits on the left side of the boat, smiling softly with her long black hair falling to one side, one hand raised near her chin and a thin bracelet on her wrist. Facing her, a young man with short messy black hair and a light stubble beard, wearing a cream vertical-striped short-sleeve shirt and blue jeans, holds up a bunch of pink lotus flowers with long stems toward her, gazing at her with a smile. The boat has a white painted rim and a dark interior, with a few pink lotus flowers resting on its edge at the top. Behind them, a calm lake covered in lily pads and lotus flowers, a distant green tree line, and a bright blue sky with large white clouds.",
+    howToUse: "Frame in 4:6 portrait mode with sideways boat orientation. Capture the romantic interaction with the bouquet of freshly plucked pink lotus flowers.",
+    cameraSettings: "85mm f/2.0 portrait lens, 1/320s, ISO 100",
+    lighting: "Golden hour diffused daylight with natural water reflections",
+    copyCount: 108,
+    featured: true,
+    dateAdded: "2026-10-09",
+    submittedBy: "@AestheticReels"
+  },
+  {
+    id: 'prompt-retro-fisheye-flip-phone',
+    title: 'Retro Fisheye Flip Phone',
+    type: 'image',
+    category: 'Streetstyle',
+    platform: 'TikTok',
+    model: 'Midjourney v6.1 / Flux.1',
+    aspectRatio: '4:5',
+    imageUrl: 'fisheye_flip_phone.jpg',
+    prompt: "Ultra-realistic studio portrait of the man from the provided photo, shot with an extreme wide-angle fisheye lens (~14mm) from a slightly high angle, close to camera. He is holding a retro flip phone (Razor-style) to his ear, leaning forward with a confident, slightly intense expression, wearing black sunglasses, looking up towards the camara. Short, styled hair with a loose curl on the forehead, full beard as in the reference. Outfit: sleeveless red tank top, black cargo pants, white sneakers. Clean studio background with cool blue/grey gradient, subtle vignette, dramatic studio lighting with back rim lights on both sides, slight lens flare, high contrast, crisp detail, sharp texture, editorial y2k vibe.\n\nAspect Ratio: 1080 x 1350 (4:5)\n\nStyle: Ultra-realistic, cinematic, editorial, high detail\n\nLighting: Hard flash / beauty dish, rim lights, slight bloom\n\nLens: Fisheye wide-angle (~14mm)\n\nMood: Confident, stylish, modern, y2k aesthetic",
+    howToUse: "Combine with an image reference of yourself or subject. Use extreme wide-angle 14mm fisheye perspective with Y2K styling, retro flip phone, and dual rim backlights.",
+    cameraSettings: "14mm ultra wide-angle fisheye, f/4.0, 1/160s, ISO 100",
+    lighting: "Beauty dish hard flash key with bilateral cool rim lights",
+    copyCount: 126,
+    featured: true,
+    dateAdded: "2026-10-09",
+    submittedBy: "@Y2KStudio"
+  },
+  {
     id: 'prompt-cinematic-monochrome-portrait',
     title: 'Cinematic Monochrome Portrait',
     type: 'image',

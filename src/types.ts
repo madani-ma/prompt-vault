@@ -18,7 +18,7 @@ export interface PromptItem {
   category: Exclude<Category, 'All'>;
   platform: 'TikTok' | 'Instagram Reel' | 'YouTube Shorts' | 'Multi-Platform';
   model: string;
-  aspectRatio: '9:16' | '16:9' | '1:1' | '4:5';
+  aspectRatio: '9:16' | '16:9' | '1:1' | '4:5' | '4:6' | '2:3' | '3:4' | string;
   prompt: string;
   howToUse: string;
   imageUrl?: string;
