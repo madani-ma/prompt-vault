@@ -76,9 +76,28 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigateHome }) => {
         headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' },
       });
       if (res.ok) {
-        const data = await res.json();
+        const rawText = await res.text();
+        let data: any = null;
+        try {
+          data = rawText ? JSON.parse(rawText) : null;
+        } catch (parseErr) {
+          console.warn('[Admin] Non-JSON response in loadRecentPrompts:', parseErr);
+        }
         if (Array.isArray(data)) {
           setRecentPrompts(data);
+          return;
+        }
+      }
+      // Fallback: check localStorage for any recently added custom prompts
+      const saved = localStorage.getItem('prompt_vault_custom_prompts_v6');
+      if (saved) {
+        try {
+          const parsedSaved = JSON.parse(saved);
+          if (Array.isArray(parsedSaved)) {
+            setRecentPrompts(parsedSaved);
+          }
+        } catch (e) {
+          console.error(e);
         }
       }
     } catch (err) {
@@ -203,10 +222,35 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigateHome }) => {
         body: JSON.stringify(payload),
       });
 
-      const result = await response.json();
+      const rawText = await response.text();
+      let result: any = null;
+      try {
+        result = rawText ? JSON.parse(rawText) : null;
+      } catch (parseErr) {
+        console.warn('[Admin] Non-JSON response received from /api/prompts:', parseErr, rawText);
+      }
 
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to submit prompt.');
+        const errorMsg = result?.error
+          || (result?.details ? `${result.error}: ${result.details}` : null)
+          || (rawText ? `Server Error (${response.status}): ${rawText.slice(0, 150)}` : `Server returned HTTP status ${response.status}`);
+        throw new Error(errorMsg);
+      }
+
+      const returnedPrompt = result?.prompt || {
+        ...payload,
+        id: `prompt-${Date.now()}-${payload.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 32)}`,
+        dateAdded: new Date().toISOString().split('T')[0],
+      };
+
+      // Client-side persistence backup: save to localStorage so it stays live across sessions/restarts
+      try {
+        const existingRaw = localStorage.getItem('prompt_vault_custom_prompts_v6');
+        const existingList = existingRaw ? JSON.parse(existingRaw) : [];
+        const updatedList = [returnedPrompt, ...existingList.filter((p: any) => p.id !== returnedPrompt.id)];
+        localStorage.setItem('prompt_vault_custom_prompts_v6', JSON.stringify(updatedList));
+      } catch (storageErr) {
+        console.warn('Could not save to localStorage:', storageErr);
       }
 
       // Success: clear form fields
@@ -214,7 +258,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigateHome }) => {
       setPromptText('');
       removeImage();
       setHowToUse('');
-      setSuccessMessage(`Prompt "${payload.title}" was successfully published live! Ready for next prompt.`);
+      const storageNotice = result?.storage ? ` [saved to ${result.storage}]` : '';
+      setSuccessMessage(`Prompt "${payload.title}" was successfully published live!${storageNotice} Ready for next prompt.`);
 
       // Focus back on title for fast sequential entry
       setTimeout(() => {

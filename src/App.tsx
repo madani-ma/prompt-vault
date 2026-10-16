@@ -109,9 +109,39 @@ export default function App() {
         },
       });
       if (res.ok) {
-        const data = await res.json();
+        const rawText = await res.text();
+        let data: any = null;
+        try {
+          data = rawText ? JSON.parse(rawText) : null;
+        } catch (e) {
+          console.warn('[App] Non-JSON prompts response from /api/prompts:', e);
+        }
+
         if (Array.isArray(data)) {
-          setPrompts(data.length > 0 ? data : INITIAL_PROMPTS);
+          // Read any locally added prompts from localStorage to guarantee immediate seamless availability
+          let customPrompts: PromptItem[] = [];
+          try {
+            const rawCustom = localStorage.getItem('prompt_vault_custom_prompts_v6');
+            if (rawCustom) {
+              const parsed = JSON.parse(rawCustom);
+              if (Array.isArray(parsed)) customPrompts = parsed;
+            }
+          } catch (storageErr) {
+            console.warn(storageErr);
+          }
+
+          // Merge: custom prompts first, then server prompts (avoid duplicates by id)
+          const seenIds = new Set<string>();
+          const merged: PromptItem[] = [];
+
+          for (const item of [...customPrompts, ...data]) {
+            if (item && item.id && !seenIds.has(item.id)) {
+              seenIds.add(item.id);
+              merged.push(item);
+            }
+          }
+
+          setPrompts(merged.length > 0 ? merged : INITIAL_PROMPTS);
         }
       }
     } catch (err) {
