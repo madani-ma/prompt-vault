@@ -35,7 +35,8 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const isAdminRoute = currentPath === '/admin' || currentPath === '/admin/';
+  const normalizedPath = currentPath.toLowerCase().replace(/\/+$/, '') || '/';
+  const isAdminRoute = normalizedPath === '/admin';
   // Theme state: Live color grading
   const [currentTheme, setCurrentTheme] = useState<ThemeGrading>(() => {
     try {
