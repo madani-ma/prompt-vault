@@ -11,10 +11,12 @@ export type Category =
 
 export type Platform = 'All' | 'TikTok' | 'Instagram Reel' | 'YouTube Shorts';
 
+export type PromptType = 'image' | 'video';
+
 export interface PromptItem {
   id: string;
   title: string;
-  type: 'image';
+  type: PromptType;
   category: Exclude<Category, 'All'>;
   platform: 'TikTok' | 'Instagram Reel' | 'YouTube Shorts' | 'Multi-Platform';
   model: string;

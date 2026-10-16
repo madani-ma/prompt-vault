@@ -11,6 +11,7 @@ import { PromptDetailModal } from './components/PromptDetailModal';
 import { SettingsModal } from './components/SettingsModal';
 import { BottomNavBar } from './components/BottomNavBar';
 import { Footer } from './components/Footer';
+import { AdminPage } from './components/AdminPage';
 import { Check, Inbox, Cloud, RefreshCw } from 'lucide-react';
 
 const SAVED_STORAGE_KEY = 'prompt_vault_saved_ids_v6';
@@ -18,6 +19,23 @@ const THEME_STORAGE_KEY = 'prompt_vault_theme_v6';
 const ITEMS_PER_PAGE = 6;
 
 export default function App() {
+  // Dedicated route handling for /admin
+  const [currentPath, setCurrentPath] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.location.pathname;
+    }
+    return '/';
+  });
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentPath(window.location.pathname);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const isAdminRoute = currentPath === '/admin' || currentPath === '/admin/';
   // Theme state: Live color grading
   const [currentTheme, setCurrentTheme] = useState<ThemeGrading>(() => {
     try {
@@ -234,6 +252,17 @@ export default function App() {
     const el = document.getElementById('prompt-grid-anchor');
     if (el) el.scrollIntoView({ behavior: 'smooth' });
   };
+
+  if (isAdminRoute) {
+    return (
+      <AdminPage
+        onNavigateHome={() => {
+          window.history.pushState({}, '', '/');
+          setCurrentPath('/');
+        }}
+      />
+    );
+  }
 
   return (
     <div className={`min-h-screen flex flex-col font-sans transition-colors duration-300 ${activeTheme.pageBg} ${activeTheme.textPrimary}`}>

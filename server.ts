@@ -53,34 +53,69 @@ async function startServer() {
     res.json(prompts);
   });
 
-  // Shared Cloud Database API: POST new prompt (Password-protected with MBS777ZX)
+  // Shared Cloud Database API: POST new prompt (Directly accessible for admin)
   app.post('/api/prompts', (req, res) => {
-    const { password, prompt } = req.body;
+    // Support both nested { prompt: { title, prompt, ... } } and direct payload { title, prompt: "...", ... }
+    const rawPrompt = (req.body && typeof req.body.prompt === 'object' && req.body.prompt !== null)
+      ? req.body.prompt
+      : (req.body || {});
 
-    const normalizedPassword = String(password || '')
-      .trim()
-      .replace(/[\u200B-\u200D\uFEFF]/g, '')
-      .replace(/\s+/g, '')
-      .toUpperCase();
+    const cleanTitle = rawPrompt.title ? String(rawPrompt.title).trim() : '';
+    const cleanPromptText = typeof rawPrompt.prompt === 'string'
+      ? rawPrompt.prompt.trim()
+      : (typeof rawPrompt.text === 'string' ? rawPrompt.text.trim() : '');
 
-    if (normalizedPassword !== 'MBS777ZX') {
-      return res.status(401).json({ error: 'Incorrect submission password. Access denied.' });
+    if (!cleanTitle || !cleanPromptText) {
+      return res.status(400).json({ error: 'Missing required prompt fields (title and prompt text are required).' });
     }
 
-    if (!prompt || !prompt.title || !prompt.prompt) {
-      return res.status(400).json({ error: 'Missing required prompt fields.' });
-    }
+    const typeValue = rawPrompt.type === 'video' || rawPrompt.type === 'Video Prompt' ? 'video' : 'image';
+    const slug = cleanTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 32);
+
+    const formattedPrompt = {
+      id: rawPrompt.id || `prompt-${Date.now()}-${slug || 'item'}`,
+      title: cleanTitle,
+      prompt: cleanPromptText,
+      category: rawPrompt.category || 'Cinematic',
+      platform: rawPrompt.platform || 'Instagram Reel',
+      type: typeValue,
+      model: rawPrompt.model || (typeValue === 'video' ? 'Runway Gen-3 / Luma Dream Machine' : 'Midjourney v6.1 / Flux.1'),
+      aspectRatio: rawPrompt.aspectRatio || '9:16',
+      howToUse: rawPrompt.howToUse || (typeValue === 'video' ? 'Copy and paste into your favorite AI video tool.' : 'Copy and paste this prompt into your preferred AI generator.'),
+      imageUrl: rawPrompt.imageUrl || undefined,
+      cameraSettings: rawPrompt.cameraSettings || 'Cinematic vertical composition, 8K HDR',
+      lighting: rawPrompt.lighting || 'Cinematic studio lighting',
+      copyCount: typeof rawPrompt.copyCount === 'number' ? rawPrompt.copyCount : 0,
+      featured: typeof rawPrompt.featured === 'boolean' ? rawPrompt.featured : false,
+      dateAdded: rawPrompt.dateAdded || new Date().toISOString().split('T')[0],
+      submittedBy: rawPrompt.submittedBy || '@Admin',
+    };
 
     const currentPrompts = readPrompts();
     // Prepend new prompt
-    const updated = [prompt, ...currentPrompts];
+    const updated = [formattedPrompt, ...currentPrompts];
     const ok = writePrompts(updated);
 
     if (!ok) {
       return res.status(500).json({ error: 'Failed to write prompt to cloud database.' });
     }
 
-    return res.status(201).json({ success: true, prompt });
+    return res.status(201).json({ success: true, prompt: formattedPrompt });
+  });
+
+  // Admin API: DELETE prompt by ID
+  app.delete('/api/prompts/:id', (req, res) => {
+    const { id } = req.params;
+    const currentPrompts = readPrompts();
+    const filtered = currentPrompts.filter((p) => p.id !== id);
+    if (filtered.length === currentPrompts.length) {
+      return res.status(404).json({ error: 'Prompt not found.' });
+    }
+    const ok = writePrompts(filtered);
+    if (!ok) {
+      return res.status(500).json({ error: 'Failed to update database.' });
+    }
+    return res.json({ success: true, deletedId: id });
   });
 
   // Health / Status check endpoint
