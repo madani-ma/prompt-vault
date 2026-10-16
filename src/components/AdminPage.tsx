@@ -14,6 +14,7 @@ import {
   Database
 } from 'lucide-react';
 import { Category, Platform, PromptItem } from '../types';
+import { sortPromptsNewestFirst } from '../utils/sorting';
 
 interface AdminPageProps {
   onNavigateHome?: () => void;
@@ -84,7 +85,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigateHome }) => {
           console.warn('[Admin] Non-JSON response in loadRecentPrompts:', parseErr);
         }
         if (Array.isArray(data)) {
-          setRecentPrompts(data);
+          setRecentPrompts(sortPromptsNewestFirst(data));
           return;
         }
       }
@@ -94,7 +95,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigateHome }) => {
         try {
           const parsedSaved = JSON.parse(saved);
           if (Array.isArray(parsedSaved)) {
-            setRecentPrompts(parsedSaved);
+            setRecentPrompts(sortPromptsNewestFirst(parsedSaved));
           }
         } catch (e) {
           console.error(e);
@@ -237,10 +238,12 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigateHome }) => {
         throw new Error(errorMsg);
       }
 
+      const nowIso = new Date().toISOString();
       const returnedPrompt = result?.prompt || {
         ...payload,
         id: `prompt-${Date.now()}-${payload.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 32)}`,
-        dateAdded: new Date().toISOString().split('T')[0],
+        dateAdded: nowIso.split('T')[0],
+        createdAt: nowIso,
       };
 
       // Client-side persistence backup: save to localStorage so it stays live across sessions/restarts

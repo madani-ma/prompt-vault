@@ -12,6 +12,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { BottomNavBar } from './components/BottomNavBar';
 import { Footer } from './components/Footer';
 import { AdminPage } from './components/AdminPage';
+import { getPromptTimestamp, sortPromptsNewestFirst } from './utils/sorting';
 import { Check, Inbox, Cloud, RefreshCw } from 'lucide-react';
 
 const SAVED_STORAGE_KEY = 'prompt_vault_saved_ids_v6';
@@ -62,14 +63,14 @@ export default function App() {
   });
 
   // Shared Cloud Database: Prompts are fetched from /api/prompts
-  const [prompts, setPrompts] = useState<PromptItem[]>(() => INITIAL_PROMPTS);
+  const [prompts, setPrompts] = useState<PromptItem[]>(() => sortPromptsNewestFirst(INITIAL_PROMPTS));
   const [isLoadingCloud, setIsLoadingCloud] = useState(true);
 
   // Filter & Search states
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<Category>('All');
   const [selectedPlatform, setSelectedPlatform] = useState<Platform>('All');
-  const [sortOption, setSortOption] = useState<SortOption>('trending');
+  const [sortOption, setSortOption] = useState<SortOption>('newest');
   const [showSavedOnly, setShowSavedOnly] = useState(false);
 
   // Pagination state
@@ -141,7 +142,8 @@ export default function App() {
             }
           }
 
-          setPrompts(merged.length > 0 ? merged : INITIAL_PROMPTS);
+          const sortedMerged = sortPromptsNewestFirst(merged);
+          setPrompts(sortedMerged.length > 0 ? sortedMerged : sortPromptsNewestFirst(INITIAL_PROMPTS));
         }
       }
     } catch (err) {
@@ -232,13 +234,28 @@ export default function App() {
       });
     }
 
-    if (sortOption === 'trending') {
-      list.sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0) || b.copyCount - a.copyCount);
-    } else if (sortOption === 'copies') {
-      list.sort((a, b) => b.copyCount - a.copyCount);
-    } else if (sortOption === 'newest') {
-      list.sort((a, b) => new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime());
-    }
+    // Sort prompts: newest/most recently added prompt always appears FIRST (descending by timestamp)
+    list.sort((a, b) => {
+      if (sortOption === 'copies') {
+        const copyDiff = b.copyCount - a.copyCount;
+        if (copyDiff !== 0) return copyDiff;
+      } else if (sortOption === 'trending') {
+        const featuredDiff = (b.featured ? 1 : 0) - (a.featured ? 1 : 0);
+        if (featuredDiff !== 0) return featuredDiff;
+        const copyDiff = b.copyCount - a.copyCount;
+        if (copyDiff !== 0) return copyDiff;
+      }
+
+      // Default & 'newest': sort strictly by creation/added timestamp in descending order (newest to oldest)
+      const timeA = getPromptTimestamp(a);
+      const timeB = getPromptTimestamp(b);
+      if (timeB !== timeA) {
+        return timeB - timeA;
+      }
+
+      // Stable fallback tiebreaker: items positioned earlier in original prompts list were added more recently
+      return prompts.indexOf(a) - prompts.indexOf(b);
+    });
 
     return list;
   }, [
@@ -277,6 +294,7 @@ export default function App() {
     setSelectedCategory('All');
     setSelectedPlatform('All');
     setShowSavedOnly(false);
+    setSortOption('newest');
   };
 
   const scrollToGrid = () => {

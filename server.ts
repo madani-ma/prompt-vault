@@ -89,6 +89,26 @@ function writePrompts(prompts: any[]): { success: boolean; location: string; err
   }
 }
 
+function getPromptTimestamp(item: any): number {
+  if (!item) return 0;
+  if (item.createdAt) {
+    const t = new Date(item.createdAt).getTime();
+    if (!isNaN(t) && t > 0) return t;
+  }
+  if (typeof item.id === 'string') {
+    const idMatch = item.id.match(/(\d{12,14})/);
+    if (idMatch) {
+      const idTs = parseInt(idMatch[1], 10);
+      if (!isNaN(idTs) && idTs > 1000000000000) return idTs;
+    }
+  }
+  if (item.dateAdded) {
+    const d = new Date(item.dateAdded).getTime();
+    if (!isNaN(d) && d > 0) return d;
+  }
+  return 0;
+}
+
 async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
@@ -96,9 +116,14 @@ async function startServer() {
   // Support JSON bodies up to 15MB for uploaded images/previews
   app.use(express.json({ limit: '15mb' }));
 
-  // Shared Cloud Database API: GET all prompts
+  // Shared Cloud Database API: GET all prompts (sorted newest first)
   app.get('/api/prompts', (_req, res) => {
     const prompts = readPrompts();
+    prompts.sort((a, b) => {
+      const timeA = getPromptTimestamp(a);
+      const timeB = getPromptTimestamp(b);
+      return timeB - timeA;
+    });
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.json(prompts);
   });
@@ -122,6 +147,7 @@ async function startServer() {
     const typeValue = rawPrompt.type === 'video' || rawPrompt.type === 'Video Prompt' ? 'video' : 'image';
     const slug = cleanTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 32);
 
+    const now = new Date();
     const formattedPrompt = {
       id: rawPrompt.id || `prompt-${Date.now()}-${slug || 'item'}`,
       title: cleanTitle,
@@ -137,7 +163,8 @@ async function startServer() {
       lighting: rawPrompt.lighting || 'Cinematic studio lighting',
       copyCount: typeof rawPrompt.copyCount === 'number' ? rawPrompt.copyCount : 0,
       featured: typeof rawPrompt.featured === 'boolean' ? rawPrompt.featured : false,
-      dateAdded: rawPrompt.dateAdded || new Date().toISOString().split('T')[0],
+      dateAdded: rawPrompt.dateAdded || now.toISOString().split('T')[0],
+      createdAt: rawPrompt.createdAt || now.toISOString(),
       submittedBy: rawPrompt.submittedBy || '@Admin',
     };
 

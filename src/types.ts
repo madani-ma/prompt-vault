@@ -29,6 +29,7 @@ export interface PromptItem {
   copyCount: number;
   featured?: boolean;
   dateAdded: string;
+  createdAt?: string;
   submittedBy?: string;
 }
 
