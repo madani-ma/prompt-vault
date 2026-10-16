@@ -62,6 +62,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigateHome }) => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Storage Driver status
+  const [storageDriver, setStorageDriver] = useState<string>('detecting');
+
   // Live prompts inspection
   const [recentPrompts, setRecentPrompts] = useState<PromptItem[]>([]);
   const [isLoadingPrompts, setIsLoadingPrompts] = useState(false);
@@ -76,6 +79,12 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigateHome }) => {
       const res = await fetch('/api/prompts', {
         headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' },
       });
+
+      const detectedDriver = res.headers.get('X-Storage-Driver');
+      if (detectedDriver) {
+        setStorageDriver(detectedDriver);
+      }
+
       if (res.ok) {
         const rawText = await res.text();
         let data: any = null;
@@ -342,6 +351,24 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigateHome }) => {
               <p className="text-xs sm:text-sm text-slate-400 mt-1">
                 Directly publishes prompts to the cloud repository. Newly submitted prompts appear immediately on the main public website without rebuild or redeploy.
               </p>
+              <div className="flex items-center gap-2 mt-3 flex-wrap">
+                {storageDriver === 'vercel-kv' ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    Database: Vercel KV (Persistent for all visitors)
+                  </span>
+                ) : storageDriver === 'vercel-blob' ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-bold bg-sky-500/15 text-sky-300 border border-sky-500/30">
+                    <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
+                    Database: Vercel Blob (Persistent)
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30" title="Connect Vercel KV in your Vercel Dashboard (Storage -> Create -> KV) to enable cross-visitor cloud sync.">
+                    <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
+                    Storage: {storageDriver} (Connect Vercel KV for global sync)
+                  </span>
+                )}
+              </div>
             </div>
             <div className="hidden sm:flex items-center gap-2 bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700/50 text-xs font-mono text-slate-300">
               <Database className="w-3.5 h-3.5 text-[#84cc16]" />

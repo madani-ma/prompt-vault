@@ -13,6 +13,8 @@
   "dependencies": {
     "@google/genai": "^2.4.0",
     "@tailwindcss/vite": "^4.3.3",
+    "@vercel/blob": "^2.8.2",
+    "@vercel/kv": "^3.0.0",
     "@vitejs/plugin-react": "^6.1.1",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
