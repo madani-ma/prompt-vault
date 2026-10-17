@@ -2,7 +2,7 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
-import { getPromptsFromDb, savePromptsToDb, getStorageDriver } from './api/prompts';
+import { getPromptsFromDb, savePromptsToDb, getStorageDriver, getStorageStatus } from './api/prompts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -142,23 +142,24 @@ async function startServer() {
 
   // Storage / DB Status diagnostic endpoint
   app.get('/api/storage/status', (_req, res) => {
-    const driver = getStorageDriver();
-    res.json({
-      status: 'ok',
-      driver,
-      isPersistent: driver === 'vercel-kv' || driver === 'vercel-blob',
-      hasKvEnv: Boolean(process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || process.env.KV_URL),
-      hasBlobEnv: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
-      time: new Date().toISOString(),
-    });
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    res.json(getStorageStatus());
   });
 
   // Health / Status check endpoint
   app.get('/api/health', (_req, res) => {
+    const status = getStorageStatus();
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
     res.json({
       status: 'ok',
-      driver: getStorageDriver(),
-      time: new Date().toISOString()
+      runtime: 'express-vite',
+      storage: {
+        driver: status.driver,
+        isPersistent: status.isPersistent,
+        connectionMode: status.connectionMode,
+        detectedVariables: status.detectedVariables,
+      },
+      time: new Date().toISOString(),
     });
   });
 

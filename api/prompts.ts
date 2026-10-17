@@ -2,16 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import { kv } from '@vercel/kv';
 import { put, list } from '@vercel/blob';
+import Redis from 'ioredis';
 
-// Automatically map Upstash Redis env vars if provided via marketplace
-if (!process.env.KV_REST_API_URL && process.env.UPSTASH_REDIS_REST_URL) {
-  process.env.KV_REST_API_URL = process.env.UPSTASH_REDIS_REST_URL;
-}
-if (!process.env.KV_REST_API_TOKEN && process.env.UPSTASH_REDIS_REST_TOKEN) {
-  process.env.KV_REST_API_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
-}
-
-// Key for Vercel KV Redis store
 const KV_PROMPTS_KEY = 'vault_prompts_v1';
 const ROOT_DIR = process.cwd();
 const PRIMARY_DB_PATH = path.join(ROOT_DIR, 'data', 'prompts.json');
@@ -19,24 +11,230 @@ const TMP_DB_PATH = path.join('/tmp', 'prompts.json');
 
 // In-memory cache for fast repeated reads within a single serverless instance
 let memoryPromptsCache: any[] | null = null;
+let ioredisInstance: Redis | null = null;
 
-export type StorageDriver = 'vercel-kv' | 'vercel-blob' | 'local-filesystem';
+export type StorageDriver = 'vercel-kv' | 'redis-tcp' | 'vercel-blob' | 'local-filesystem';
+
+export interface StorageConfig {
+  driver: StorageDriver;
+  isPersistent: boolean;
+  connectionMode: 'vercel-kv-rest' | 'redis-tcp' | 'vercel-blob' | 'local-filesystem';
+  detectedVars: string[];
+  restUrl?: string;
+  hasToken: boolean;
+}
 
 /**
- * Detect which persistent storage driver is configured in the environment
+ * Universal environment variable detector for Redis, Vercel KV, and Blob storage.
+ * Detects all common naming conventions from Vercel, Upstash, and third-party integrations:
+ * - KV_REST_API_URL / KV_REST_API_TOKEN
+ * - UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN
+ * - REDIS_URL / KV_URL (redis:// or rediss://)
+ * - Auto-derives REST endpoints from Upstash TCP connection strings
  */
+export function resolveStorageConfig(): StorageConfig {
+  const detectedVars: string[] = [];
+  let restUrl: string | undefined = undefined;
+  let restToken: string | undefined = undefined;
+  let redisTcpUrl: string | undefined = undefined;
+
+  // 1. Scan for explicit REST API URLs
+  const candidateRestUrlKeys = [
+    'KV_REST_API_URL',
+    'UPSTASH_REDIS_REST_URL',
+    'REDIS_REST_API_URL',
+    'REST_API_URL',
+  ];
+  for (const key of candidateRestUrlKeys) {
+    if (process.env[key] && typeof process.env[key] === 'string' && process.env[key]!.trim()) {
+      restUrl = process.env[key]!.trim();
+      detectedVars.push(key);
+      break;
+    }
+  }
+
+  // Also check any key ending with REST_API_URL (e.g. PROD_KV_REST_API_URL)
+  if (!restUrl) {
+    for (const [key, val] of Object.entries(process.env)) {
+      if (typeof val === 'string' && val.trim() && (key.endsWith('_KV_REST_API_URL') || key.endsWith('_UPSTASH_REDIS_REST_URL') || key.endsWith('_REST_API_URL'))) {
+        restUrl = val.trim();
+        detectedVars.push(key);
+        break;
+      }
+    }
+  }
+
+  // 2. Scan for explicit REST API Tokens
+  const candidateRestTokenKeys = [
+    'KV_REST_API_TOKEN',
+    'UPSTASH_REDIS_REST_TOKEN',
+    'REDIS_REST_API_TOKEN',
+    'REDIS_TOKEN',
+    'REST_API_TOKEN',
+  ];
+  for (const key of candidateRestTokenKeys) {
+    if (process.env[key] && typeof process.env[key] === 'string' && process.env[key]!.trim()) {
+      restToken = process.env[key]!.trim();
+      detectedVars.push(key);
+      break;
+    }
+  }
+
+  if (!restToken) {
+    for (const [key, val] of Object.entries(process.env)) {
+      if (typeof val === 'string' && val.trim() && (key.endsWith('_KV_REST_API_TOKEN') || key.endsWith('_UPSTASH_REDIS_REST_TOKEN') || key.endsWith('_REST_API_TOKEN'))) {
+        restToken = val.trim();
+        detectedVars.push(key);
+        break;
+      }
+    }
+  }
+
+  // 3. Scan for Redis Connection Strings (redis:// or rediss://)
+  const candidateRedisUrlKeys = [
+    'KV_URL',
+    'REDIS_URL',
+    'UPSTASH_REDIS_URL',
+    'STORAGE_REDIS_URL',
+    'STORAGE_URL',
+    'REDIS_URI',
+  ];
+  for (const key of candidateRedisUrlKeys) {
+    if (process.env[key] && typeof process.env[key] === 'string' && (process.env[key]!.startsWith('redis://') || process.env[key]!.startsWith('rediss://'))) {
+      redisTcpUrl = process.env[key]!.trim();
+      detectedVars.push(key);
+      break;
+    }
+  }
+
+  // Dynamic search for any key whose value starts with redis:// or rediss://
+  if (!redisTcpUrl) {
+    for (const [key, val] of Object.entries(process.env)) {
+      if (typeof val === 'string' && (val.startsWith('redis://') || val.startsWith('rediss://'))) {
+        redisTcpUrl = val.trim();
+        detectedVars.push(key);
+        break;
+      }
+    }
+  }
+
+  // 4. If we have a Redis TCP URL from Upstash, auto-derive the REST URL and Token
+  if (redisTcpUrl && (!restUrl || !restToken)) {
+    try {
+      const parsed = new URL(redisTcpUrl);
+      if (parsed.hostname && parsed.hostname.includes('upstash.io')) {
+        if (!restUrl) {
+          restUrl = `https://${parsed.hostname}`;
+          detectedVars.push('DERIVED_UPSTASH_REST_URL');
+        }
+        if (!restToken) {
+          restToken = parsed.password || parsed.username;
+          detectedVars.push('DERIVED_UPSTASH_REST_TOKEN');
+        }
+      }
+    } catch (parseErr) {
+      console.warn('[Storage] Error parsing redis connection URL:', parseErr);
+    }
+  }
+
+  // 5. If REST credentials were found or derived, ensure @vercel/kv environment variables are set
+  if (restUrl && restToken) {
+    process.env.KV_REST_API_URL = restUrl;
+    process.env.KV_REST_API_TOKEN = restToken;
+    return {
+      driver: 'vercel-kv',
+      isPersistent: true,
+      connectionMode: 'vercel-kv-rest',
+      detectedVars,
+      restUrl,
+      hasToken: Boolean(restToken),
+    };
+  }
+
+  // 6. If TCP Redis URL is found (e.g. non-Upstash Redis or direct TCP)
+  if (redisTcpUrl) {
+    return {
+      driver: 'redis-tcp',
+      isPersistent: true,
+      connectionMode: 'redis-tcp',
+      detectedVars,
+      hasToken: true,
+    };
+  }
+
+  // 7. Check for Vercel Blob
+  if (process.env.BLOB_READ_WRITE_TOKEN) {
+    detectedVars.push('BLOB_READ_WRITE_TOKEN');
+    return {
+      driver: 'vercel-blob',
+      isPersistent: true,
+      connectionMode: 'vercel-blob',
+      detectedVars,
+      hasToken: true,
+    };
+  }
+
+  return {
+    driver: 'local-filesystem',
+    isPersistent: false,
+    connectionMode: 'local-filesystem',
+    detectedVars,
+    hasToken: false,
+  };
+}
+
 export function getStorageDriver(): StorageDriver {
-  const hasKv = Boolean(
-    (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) ||
-    (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) ||
-    process.env.KV_URL
-  );
+  return resolveStorageConfig().driver;
+}
 
-  if (hasKv) return 'vercel-kv';
+export function getStorageStatus() {
+  const config = resolveStorageConfig();
+  return {
+    status: 'ok',
+    driver: config.driver,
+    isPersistent: config.isPersistent,
+    connectionMode: config.connectionMode,
+    detectedVariables: config.detectedVars,
+    hasCredentials: config.hasToken,
+    time: new Date().toISOString(),
+  };
+}
 
-  if (process.env.BLOB_READ_WRITE_TOKEN) return 'vercel-blob';
+/**
+ * Returns a singleton ioredis client if TCP connection string is active
+ */
+function getRedisClient(): Redis | null {
+  const config = resolveStorageConfig();
+  if (config.driver !== 'redis-tcp') return null;
 
-  return 'local-filesystem';
+  if (!ioredisInstance) {
+    const candidateKeys = ['KV_URL', 'REDIS_URL', 'UPSTASH_REDIS_URL', 'STORAGE_REDIS_URL', 'STORAGE_URL'];
+    let connectionUrl = '';
+    for (const key of candidateKeys) {
+      if (process.env[key] && (process.env[key]!.startsWith('redis://') || process.env[key]!.startsWith('rediss://'))) {
+        connectionUrl = process.env[key]!;
+        break;
+      }
+    }
+    if (!connectionUrl) {
+      for (const val of Object.values(process.env)) {
+        if (typeof val === 'string' && (val.startsWith('redis://') || val.startsWith('rediss://'))) {
+          connectionUrl = val;
+          break;
+        }
+      }
+    }
+
+    if (connectionUrl) {
+      ioredisInstance = new Redis(connectionUrl, {
+        maxRetriesPerRequest: 3,
+        connectTimeout: 5000,
+        lazyConnect: true,
+      });
+    }
+  }
+
+  return ioredisInstance;
 }
 
 /**
@@ -71,73 +269,100 @@ function getBundledDefaultPrompts(): any[] {
 }
 
 /**
- * Reads all prompts from persistent storage (Vercel KV -> Vercel Blob -> local JSON file)
+ * Reads all prompts from persistent storage (Vercel KV REST -> ioredis TCP -> Vercel Blob -> local JSON file)
  */
-export async function getPromptsFromDb(): Promise<{ prompts: any[]; driver: StorageDriver }> {
-  const driver = getStorageDriver();
+export async function getPromptsFromDb(): Promise<{ prompts: any[]; driver: StorageDriver; mode: string }> {
+  const config = resolveStorageConfig();
 
-  // 1. Try Vercel KV (Redis)
-  if (driver === 'vercel-kv') {
+  // 1. Vercel KV REST (Native @vercel/kv)
+  if (config.driver === 'vercel-kv') {
     try {
       const kvData = await kv.get<any[]>(KV_PROMPTS_KEY);
       if (Array.isArray(kvData) && kvData.length > 0) {
         memoryPromptsCache = kvData;
-        return { prompts: kvData, driver: 'vercel-kv' };
+        return { prompts: kvData, driver: 'vercel-kv', mode: 'vercel-kv-rest' };
       }
 
       // First run: Seed Vercel KV with bundled prompts
-      console.log('[Storage: Vercel KV] Seeding fresh KV store with bundled prompts...');
+      console.log('[Storage: Vercel KV] Seeding fresh KV store with default prompts...');
       const defaultPrompts = getBundledDefaultPrompts();
       if (defaultPrompts.length > 0) {
         await kv.set(KV_PROMPTS_KEY, defaultPrompts);
         memoryPromptsCache = defaultPrompts;
-        return { prompts: defaultPrompts, driver: 'vercel-kv' };
+        return { prompts: defaultPrompts, driver: 'vercel-kv', mode: 'vercel-kv-rest' };
       }
     } catch (kvErr: any) {
-      console.error('[Storage: Vercel KV] Error reading from KV store:', kvErr?.message || kvErr);
+      console.error('[Storage: Vercel KV REST ERROR]', kvErr?.message || kvErr);
     }
   }
 
-  // 2. Try Vercel Blob
-  if (driver === 'vercel-blob') {
+  // 2. TCP Redis via ioredis
+  if (config.driver === 'redis-tcp') {
+    try {
+      const client = getRedisClient();
+      if (client) {
+        if (client.status === 'wait') await client.connect();
+        const raw = await client.get(KV_PROMPTS_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            memoryPromptsCache = parsed;
+            return { prompts: parsed, driver: 'redis-tcp', mode: 'redis-tcp' };
+          }
+        }
+        // First run seed
+        console.log('[Storage: Redis TCP] Seeding fresh Redis instance with default prompts...');
+        const defaultPrompts = getBundledDefaultPrompts();
+        if (defaultPrompts.length > 0) {
+          await client.set(KV_PROMPTS_KEY, JSON.stringify(defaultPrompts));
+          memoryPromptsCache = defaultPrompts;
+          return { prompts: defaultPrompts, driver: 'redis-tcp', mode: 'redis-tcp' };
+        }
+      }
+    } catch (tcpErr: any) {
+      console.error('[Storage: Redis TCP ERROR]', tcpErr?.message || tcpErr);
+    }
+  }
+
+  // 3. Vercel Blob
+  if (config.driver === 'vercel-blob') {
     try {
       const blobs = await list({ prefix: 'prompts.json' });
       const promptsBlob = blobs.blobs.find((b) => b.pathname === 'prompts.json');
       if (promptsBlob?.url) {
         const res = await fetch(promptsBlob.url, {
-          headers: { 'Cache-Control': 'no-cache, no-store' }
+          headers: { 'Cache-Control': 'no-cache, no-store' },
         });
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data)) {
             memoryPromptsCache = data;
-            return { prompts: data, driver: 'vercel-blob' };
+            return { prompts: data, driver: 'vercel-blob', mode: 'vercel-blob' };
           }
         }
       }
     } catch (blobErr: any) {
-      console.error('[Storage: Vercel Blob] Error reading from Blob store:', blobErr?.message || blobErr);
+      console.error('[Storage: Vercel Blob ERROR]', blobErr?.message || blobErr);
     }
   }
 
-  // 3. Fallback: Local filesystem / memory cache
+  // 4. Fallback: Local filesystem / memory cache
   const localPrompts = getBundledDefaultPrompts();
-  return { prompts: localPrompts, driver: 'local-filesystem' };
+  return { prompts: localPrompts, driver: 'local-filesystem', mode: 'local-filesystem' };
 }
 
 /**
  * Saves prompts to persistent storage and rigorously verifies the write.
- * Returns { success: false, error: '...' } if the database write did not persist.
  */
 export async function savePromptsToDb(prompts: any[]): Promise<{
   success: boolean;
   driver: StorageDriver;
   error?: string;
 }> {
-  const driver = getStorageDriver();
+  const config = resolveStorageConfig();
 
-  // 1. Save to Vercel KV (Persistent globally across all users/devices)
-  if (driver === 'vercel-kv') {
+  // 1. Save to Vercel KV REST
+  if (config.driver === 'vercel-kv') {
     try {
       console.log(`[Storage: Vercel KV] Writing ${prompts.length} prompts to KV key "${KV_PROMPTS_KEY}"...`);
       await kv.set(KV_PROMPTS_KEY, prompts);
@@ -151,43 +376,60 @@ export async function savePromptsToDb(prompts: any[]): Promise<{
       }
 
       memoryPromptsCache = verified;
-      console.log(`[Storage: Vercel KV] Write verified successfully. ${verified.length} prompts live.`);
+      console.log(`[Storage: Vercel KV] Write verified successfully: ${verified.length} prompts persistent.`);
       return { success: true, driver: 'vercel-kv' };
     } catch (kvErr: any) {
       const errorMsg = `Vercel KV write error: ${kvErr?.message || String(kvErr)}`;
       console.error('[Storage: Vercel KV CRITICAL ERROR]:', kvErr);
-      return {
-        success: false,
-        driver: 'vercel-kv',
-        error: errorMsg
-      };
+      return { success: false, driver: 'vercel-kv', error: errorMsg };
     }
   }
 
-  // 2. Save to Vercel Blob
-  if (driver === 'vercel-blob') {
+  // 2. Save to TCP Redis via ioredis
+  if (config.driver === 'redis-tcp') {
+    try {
+      const client = getRedisClient();
+      if (!client) throw new Error('Could not initialize Redis TCP client.');
+      if (client.status === 'wait') await client.connect();
+
+      await client.set(KV_PROMPTS_KEY, JSON.stringify(prompts));
+
+      // Verify
+      const checkRaw = await client.get(KV_PROMPTS_KEY);
+      const checkParsed = checkRaw ? JSON.parse(checkRaw) : null;
+      if (!Array.isArray(checkParsed) || checkParsed.length !== prompts.length) {
+        throw new Error(`Redis TCP verification failed: expected ${prompts.length} items`);
+      }
+
+      memoryPromptsCache = checkParsed;
+      console.log(`[Storage: Redis TCP] Write verified successfully: ${checkParsed.length} prompts persistent.`);
+      return { success: true, driver: 'redis-tcp' };
+    } catch (tcpErr: any) {
+      const errorMsg = `Redis TCP write error: ${tcpErr?.message || String(tcpErr)}`;
+      console.error('[Storage: Redis TCP CRITICAL ERROR]:', tcpErr);
+      return { success: false, driver: 'redis-tcp', error: errorMsg };
+    }
+  }
+
+  // 3. Save to Vercel Blob
+  if (config.driver === 'vercel-blob') {
     try {
       console.log(`[Storage: Vercel Blob] Writing ${prompts.length} prompts to Blob storage...`);
       await put('prompts.json', JSON.stringify(prompts, null, 2), {
         access: 'public',
-        addRandomSuffix: false
+        addRandomSuffix: false,
       });
       memoryPromptsCache = prompts;
-      console.log(`[Storage: Vercel Blob] Write successful. ${prompts.length} prompts persisted.`);
+      console.log(`[Storage: Vercel Blob] Write successful: ${prompts.length} prompts persisted.`);
       return { success: true, driver: 'vercel-blob' };
     } catch (blobErr: any) {
       const errorMsg = `Vercel Blob write error: ${blobErr?.message || String(blobErr)}`;
       console.error('[Storage: Vercel Blob CRITICAL ERROR]:', blobErr);
-      return {
-        success: false,
-        driver: 'vercel-blob',
-        error: errorMsg
-      };
+      return { success: false, driver: 'vercel-blob', error: errorMsg };
     }
   }
 
-  // 3. Fallback: Local filesystem
-  // Check if we are running in a stateless serverless environment on Vercel
+  // 4. Fallback: Local filesystem
   const isVercelServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
   if (isVercelServerless) {
     const serverlessNotice =
@@ -196,11 +438,11 @@ export async function savePromptsToDb(prompts: any[]): Promise<{
     return {
       success: false,
       driver: 'local-filesystem',
-      error: serverlessNotice
+      error: serverlessNotice,
     };
   }
 
-  // Local development / persistent disk environment (Node.js dev server, Docker, Cloud Run)
+  // Local development persistent disk environment (Node.js dev server)
   try {
     const dataDir = path.dirname(PRIMARY_DB_PATH);
     if (!fs.existsSync(dataDir)) {
@@ -208,7 +450,7 @@ export async function savePromptsToDb(prompts: any[]): Promise<{
     }
     fs.writeFileSync(PRIMARY_DB_PATH, JSON.stringify(prompts, null, 2), 'utf-8');
 
-    // Verify local write
+    // Verify
     const checkRaw = fs.readFileSync(PRIMARY_DB_PATH, 'utf-8');
     const checkParsed = JSON.parse(checkRaw);
     if (!Array.isArray(checkParsed) || checkParsed.length !== prompts.length) {
@@ -223,7 +465,7 @@ export async function savePromptsToDb(prompts: any[]): Promise<{
     return {
       success: false,
       driver: 'local-filesystem',
-      error: `Failed to write to local filesystem: ${localErr?.message || String(localErr)}`
+      error: `Failed to write to local filesystem: ${localErr?.message || String(localErr)}`,
     };
   }
 }
@@ -278,7 +520,7 @@ export default async function handler(req: any, res: any) {
   try {
     // GET: Retrieve all prompts from persistent database (STRICT NO-CACHE)
     if (req.method === 'GET') {
-      const { prompts, driver } = await getPromptsFromDb();
+      const { prompts, driver, mode } = await getPromptsFromDb();
       
       // Sort newest-first in descending order by timestamp
       prompts.sort((a, b) => {
@@ -293,14 +535,14 @@ export default async function handler(req: any, res: any) {
       res.setHeader('Expires', '0');
       res.setHeader('Surrogate-Control', 'no-store');
       res.setHeader('X-Storage-Driver', driver);
+      res.setHeader('X-Storage-Mode', mode);
       return res.status(200).json(prompts);
     }
 
-    // POST: Create new prompt and persist to cloud database (Vercel KV / Blob)
+    // POST: Create new prompt and persist to cloud database (Vercel KV / Redis / Blob)
     if (req.method === 'POST') {
       let body = req.body;
 
-      // Handle unparsed string bodies in serverless
       if (typeof body === 'string') {
         try {
           body = JSON.parse(body);
@@ -309,12 +551,11 @@ export default async function handler(req: any, res: any) {
           return res.status(400).json({ 
             success: false,
             error: 'Invalid JSON request body.',
-            details: err.message
+            details: err.message,
           });
         }
       }
 
-      // Support both nested { prompt: { ... } } and direct payload { title, prompt: "...", ... }
       const rawPrompt = (body && typeof body.prompt === 'object' && body.prompt !== null)
         ? body.prompt
         : (body || {});
@@ -328,7 +569,7 @@ export default async function handler(req: any, res: any) {
         console.warn('[API /api/prompts] Missing required fields in payload:', { title: cleanTitle, hasPromptText: Boolean(cleanPromptText) });
         return res.status(400).json({ 
           success: false,
-          error: 'Missing required prompt fields: both title and prompt text are required.' 
+          error: 'Missing required prompt fields: both title and prompt text are required.',
         });
       }
 
@@ -359,15 +600,14 @@ export default async function handler(req: any, res: any) {
       const { prompts: currentPrompts } = await getPromptsFromDb();
       const updatedPrompts = [formattedPrompt, ...currentPrompts.filter((p) => p.id !== formattedPrompt.id)];
 
-      // Write to persistent database (Vercel KV -> Vercel Blob -> fallback)
+      // Write to persistent database
       const saveResult = await savePromptsToDb(updatedPrompts);
 
-      // CRITICAL: If the write did not succeed, return HTTP 500 error with descriptive message
       if (!saveResult.success) {
         console.error('[API /api/prompts ERROR] Failed to save prompt:', {
           title: formattedPrompt.title,
           error: saveResult.error,
-          driver: saveResult.driver
+          driver: saveResult.driver,
         });
         return res.status(500).json({
           success: false,
@@ -385,7 +625,7 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    // DELETE: Delete prompt by ID (supports ?id=... or body { id })
+    // DELETE: Delete prompt by ID
     if (req.method === 'DELETE') {
       const id = (req.query && req.query.id) || (req.body && req.body.id);
       if (!id) {
@@ -417,7 +657,7 @@ export default async function handler(req: any, res: any) {
     return res.status(500).json({
       success: false,
       error: fatalError?.message || 'Internal Server Error',
-      details: String(fatalError?.stack || fatalError)
+      details: String(fatalError?.stack || fatalError),
     });
   }
 }
