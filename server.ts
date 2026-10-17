@@ -2,7 +2,7 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
-import { getPromptsFromDb, savePromptsToDb, getStorageDriver } from './api/_storage';
+import { getPromptsFromDb, savePromptsToDb, getStorageDriver } from './api/prompts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
