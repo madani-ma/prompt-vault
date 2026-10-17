@@ -101,14 +101,19 @@ export default function App() {
     }
   }, [currentTheme]);
 
-  // Fetch prompts directly from shared cloud database
+  // Fetch prompts directly from shared cloud database (strictly no-cache)
   const fetchPromptsFromCloud = useCallback(async () => {
     try {
-      const res = await fetch('/api/prompts', {
+      // Use cache-busting timestamp + no-store to guarantee latest database state
+      const res = await fetch(`/api/prompts?_t=${Date.now()}`, {
+        cache: 'no-store',
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
         },
       });
+
       if (res.ok) {
         const rawText = await res.text();
         let data: any = null;
@@ -157,8 +162,8 @@ export default function App() {
   useEffect(() => {
     fetchPromptsFromCloud();
 
-    // Auto-sync every 6 seconds so other visitors and devices see newly submitted prompts live
-    const interval = setInterval(fetchPromptsFromCloud, 6000);
+    // Auto-sync every 3 seconds so other visitors and devices see newly submitted prompts live
+    const interval = setInterval(fetchPromptsFromCloud, 3000);
 
     const onVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
@@ -308,6 +313,7 @@ export default function App() {
         onNavigateHome={() => {
           window.history.pushState({}, '', '/');
           setCurrentPath('/');
+          fetchPromptsFromCloud();
         }}
       />
     );

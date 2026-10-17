@@ -34,7 +34,7 @@ async function startServer() {
   // Support JSON bodies up to 15MB for uploaded images/previews
   app.use(express.json({ limit: '15mb' }));
 
-  // Shared Cloud Database API: GET all prompts (sorted newest first)
+  // Shared Cloud Database API: GET all prompts (sorted newest first, strictly no-cache)
   app.get('/api/prompts', async (_req, res) => {
     try {
       const { prompts, driver } = await getPromptsFromDb();
@@ -43,7 +43,10 @@ async function startServer() {
         const timeB = getPromptTimestamp(b);
         return timeB - timeA;
       });
-      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.setHeader('Surrogate-Control', 'no-store');
       res.setHeader('X-Storage-Driver', driver);
       res.json(prompts);
     } catch (err: any) {
@@ -98,13 +101,21 @@ async function startServer() {
       const updated = [formattedPrompt, ...currentPrompts.filter((p: any) => p.id !== formattedPrompt.id)];
       const saveResult = await savePromptsToDb(updated);
 
+      if (!saveResult.success) {
+        console.error('[Server POST /api/prompts ERROR] Failed to save prompt:', saveResult.error);
+        return res.status(500).json({
+          success: false,
+          error: saveResult.error || 'Failed to save prompt to database.',
+          storage: saveResult.driver,
+        });
+      }
+
       console.log(`[Server POST /api/prompts] Added "${formattedPrompt.title}" (${formattedPrompt.id}). Database: ${saveResult.driver}. Total: ${updated.length}`);
 
       return res.status(201).json({
         success: true,
         prompt: formattedPrompt,
         storage: saveResult.driver,
-        notice: saveResult.error || undefined,
       });
     } catch (err: any) {
       console.error('[Server POST /api/prompts error]', err);

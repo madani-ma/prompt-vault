@@ -76,8 +76,13 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigateHome }) => {
   const loadRecentPrompts = async () => {
     setIsLoadingPrompts(true);
     try {
-      const res = await fetch('/api/prompts', {
-        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' },
+      const res = await fetch(`/api/prompts?_t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
       });
 
       const detectedDriver = res.headers.get('X-Storage-Driver');
@@ -224,10 +229,12 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigateHome }) => {
     };
 
     try {
-      const response = await fetch('/api/prompts', {
+      const response = await fetch(`/api/prompts?_t=${Date.now()}`, {
         method: 'POST',
+        cache: 'no-store',
         headers: {
           'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store',
         },
         body: JSON.stringify(payload),
       });
@@ -240,10 +247,10 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigateHome }) => {
         console.warn('[Admin] Non-JSON response received from /api/prompts:', parseErr, rawText);
       }
 
-      if (!response.ok) {
+      if (!response.ok || !result || result.success !== true) {
         const errorMsg = result?.error
           || (result?.details ? `${result.error}: ${result.details}` : null)
-          || (rawText ? `Server Error (${response.status}): ${rawText.slice(0, 150)}` : `Server returned HTTP status ${response.status}`);
+          || (rawText ? `Database Error (${response.status}): ${rawText.slice(0, 200)}` : `Server returned HTTP status ${response.status}`);
         throw new Error(errorMsg);
       }
 
@@ -270,7 +277,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigateHome }) => {
       setPromptText('');
       removeImage();
       setHowToUse('');
-      const storageNotice = result?.storage ? ` [saved to ${result.storage}]` : '';
+      const storageNotice = result?.storage ? ` [confirmed in ${result.storage}]` : '';
       setSuccessMessage(`Prompt "${payload.title}" was successfully published live!${storageNotice} Ready for next prompt.`);
 
       // Focus back on title for fast sequential entry
