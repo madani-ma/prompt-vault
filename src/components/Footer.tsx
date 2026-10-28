@@ -61,10 +61,10 @@ export const Footer: React.FC = () => {
           <div className="space-y-2 max-w-md">
             <div className="flex items-center gap-2.5">
               <span className="w-8 h-8 rounded-xl bg-[#84cc16] text-black flex items-center justify-center font-black text-xs shadow-xs">
-                PV
+                FP
               </span>
               <span className="font-black text-lg uppercase tracking-tight text-white">
-                Prompt Vault
+                Faith Prompt
               </span>
             </div>
             <p className="text-xs text-slate-400 leading-relaxed font-normal">
@@ -114,7 +114,7 @@ export const Footer: React.FC = () => {
         {/* Bottom Bar */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
           <div>
-            © {new Date().getFullYear()} Prompt Vault · Curated for TikTok, Instagram Reels, and YouTube Shorts.
+            © {new Date().getFullYear()} Faith Prompt · Curated for TikTok, Instagram Reels, and YouTube Shorts.
           </div>
           <div className="flex items-center gap-4 text-[11px] text-slate-500">
             <span>Verified Submissions</span>

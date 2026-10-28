@@ -21,13 +21,13 @@ export const NavyFeatureSection: React.FC<NavyFeatureSectionProps> = ({
         <div className="text-center max-w-3xl mx-auto mb-12">
           <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-slate-800/80 border border-slate-700 text-[#84cc16] text-[11px] font-black uppercase tracking-widest mb-4">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>HOW PROMPT VAULT WORKS</span>
+            <span>HOW FAITH PROMPT WORKS</span>
           </div>
           <h2 className="text-3xl sm:text-4xl font-black uppercase tracking-tight text-white mb-4">
             BUILT FOR VIRAL CREATORS & HIGH-RETENTION CONTENT
           </h2>
           <p className="text-sm sm:text-base text-slate-300 font-normal leading-relaxed">
-            Every prompt in the vault is engineered with specific camera focal lengths, lighting setups, and aspect ratios tailored for modern short-form feeds.
+            Every prompt in Faith Prompt is engineered with specific camera focal lengths, lighting setups, and aspect ratios tailored for modern short-form feeds.
           </p>
         </div>
 

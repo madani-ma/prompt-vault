@@ -190,7 +190,7 @@ async function startServer() {
   });
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Prompt Vault server running on http://0.0.0.0:${PORT} [Storage Driver: ${getStorageDriver()}]`);
+    console.log(`Faith Prompt server running on http://0.0.0.0:${PORT} [Storage Driver: ${getStorageDriver()}]`);
   });
 }
 

@@ -321,6 +321,53 @@ export default function App() {
 
   return (
     <div className={`min-h-screen flex flex-col font-sans transition-colors duration-300 ${activeTheme.pageBg} ${activeTheme.textPrimary}`}>
+      {/* Top Header / Navbar with Faith Prompt logo in corner */}
+      <header className={`w-full border-b backdrop-blur-md sticky top-0 z-30 transition-colors ${
+        activeTheme.id === 'cyber' || activeTheme.id === 'monochrome'
+          ? 'bg-slate-950/85 border-slate-800/80 text-white'
+          : 'bg-white/85 border-slate-200/80 text-slate-900'
+      }`}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between">
+          <a
+            href="/"
+            onClick={(e) => {
+              e.preventDefault();
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className="flex items-center gap-2.5 sm:gap-3 group cursor-pointer"
+            title="Faith Prompt — Home"
+          >
+            <span className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#84cc16] text-black flex items-center justify-center font-black text-xs tracking-wider shadow-xs group-hover:scale-105 transition-transform">
+              FP
+            </span>
+            <div className="flex flex-col">
+              <span className="font-black text-sm sm:text-base tracking-tight uppercase leading-none">
+                Faith <span className={activeTheme.heroTitleGradient}>Prompt</span>
+              </span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 hidden sm:inline mt-0.5">
+                Curated AI Prompts
+              </span>
+            </div>
+          </a>
+
+          {/* Right Header items: Cloud DB live status & Explore button */}
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="hidden sm:flex items-center gap-1.5 text-[11px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
+              <Cloud className="w-3.5 h-3.5" />
+              <span>Cloud DB Live</span>
+            </div>
+            <button
+              onClick={scrollToGrid}
+              className={`text-xs font-black uppercase tracking-wider px-3.5 py-1.5 rounded-full border transition-all cursor-pointer ${
+                activeTheme.accentPill
+              } ${activeTheme.accentPillHover} ${activeTheme.accentPillText}`}
+            >
+              Explore
+            </button>
+          </div>
+        </div>
+      </header>
+
       {/* Hero Section: Live theme background and single Explore button */}
       <Hero
         totalCount={prompts.length}

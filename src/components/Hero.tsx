@@ -26,13 +26,13 @@ export const Hero: React.FC<HeroProps> = ({ totalCount, theme, onExploreClick })
           </span>
           <span className="opacity-40">·</span>
           <span className="text-[11px] font-bold opacity-80">
-            CREATOR VAULT
+            FAITH PROMPT
           </span>
         </div>
 
         {/* Bold uppercase heading */}
         <h1 className="text-5xl sm:text-7xl md:text-8xl font-black tracking-tight uppercase mb-5 leading-[0.95]">
-          PROMPT <span className={theme.heroTitleGradient}>VAULT</span>
+          FAITH <span className={theme.heroTitleGradient}>PROMPT</span>
         </h1>
 
         {/* Tagline */}

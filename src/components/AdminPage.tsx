@@ -324,7 +324,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigateHome }) => {
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#84cc16] animate-pulse" />
               <h1 className="text-sm font-black uppercase tracking-wider text-white">
-                Prompt Vault · Admin
+                Faith Prompt · Admin
               </h1>
               <span className="text-[10px] font-mono uppercase bg-[#84cc16]/10 text-[#84cc16] border border-[#84cc16]/20 px-2 py-0.5 rounded-full font-bold">
                 Direct /api/prompts
